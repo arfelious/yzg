@@ -1,10 +1,14 @@
-<h1>YZG</h1>
+<h1 align="center">🤖 YZG 🤖</h1>
 <hr/>
 <h2>Yerel resimler asset olarak kullanılırken sorun çıkmaması için live server gibi bir eklenti kullanmamız veya bir dosya sunucusu oluşturmamız gerekiyor, ilki daha elverişli olur
 </h2>
 <hr/>
+<div align="center">
 <h3>Repository'ye erişiminizi doğrulamak için isminizin yanına tik atabilirsiniz
 ✅</h3>
+</div>
+<hr/>
+<div align="center">
 <h4>Arda Doğu Ari ✅ </h4>
 <h4>Ömer Hüseynov ❌</h4>
 <h4>Başak Demir ❌</h4>
@@ -25,5 +29,7 @@
 <h4>Sibel Genç ❌</h4>
 <h4>Kaan Biber ❌</h4>
 <h4>Ahsen Ela Akgün ❌</h4>
+</div>
+<hr/>
 
 
