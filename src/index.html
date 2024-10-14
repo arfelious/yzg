@@ -7,8 +7,16 @@
     <script src="https://pixijs.download/release/pixi.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
     <script type="module">
+        const WIDTH = 640
+        const HEIGHT = 360
         const app = new PIXI.Application();
-        await app.init({ width: 640, height: 360 });
+        await app.init({ width: WIDTH, height: HEIGHT });
+        await PIXI.Assets.load('../assets/temp_car.png');
+        let sprite = PIXI.Sprite.from('../assets/temp_car.png');
+        let wh = sprite.getSize()
+        const CAR_WIDTH = 64
+        sprite.setSize(CAR_WIDTH,CAR_WIDTH*wh.height/wh.width)
+        app.stage.addChild(sprite);
         document.body.appendChild(app.canvas);
       </script>
   </body>
