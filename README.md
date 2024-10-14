@@ -3,7 +3,8 @@
 <h2>Yerel resimler asset olarak kullanılırken sorun çıkmaması için live server gibi bir eklenti kullanmamız veya bir dosya sunucusu oluşturmamız gerekiyor, ilki daha elverişli olur
 </h2>
 <hr/>
-<h3>Repository' ye erişimi olanlar ✅ atabilir mi</h3>
+<h3>Repository'ye erişiminizi doğrulamak için isminizin yanına tik atabilirsiniz
+✅</h3>
 <h4>Arda Doğu Ari ✅ </h4>
 <h4>Ömer Hüseynov ❌</h4>
 <h4>Başak Demir ❌</h4>
