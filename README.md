@@ -10,7 +10,7 @@
 <hr/>
 <div align="center">
 <h4>Arda Doğu Ari ✅ </h4>
-<h4>Ömer Hüseynov ❌</h4>
+<h4>Ömer Hüseynov ✅</h4>
 <h4>Başak Demir ❌</h4>
 <h4>Muslim Tsoroev ✅</h4>
 <h4>Elvin Guseinov ✅ </h4>
