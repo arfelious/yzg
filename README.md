@@ -14,7 +14,7 @@
 <h4>Başak Demir ❌</h4>
 <h4>Muslim Tsoroev ❌</h4>
 <h4>Elvin Guseinov ✅ </h4>
-<h4>Yunus Emre Küpücü ❌</h4>
+<h4>Yunus Emre Küpücü ✅</h4>
 <h4>Batuhan Özdemir ❌</h4>
 <h4>Elif Örs ❌</h4>
 <h4>Melisa Şimşek ❌</h4>
