@@ -7,17 +7,169 @@
     <script src="https://pixijs.download/release/pixi.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
     <script type="module">
+        /*
+        TODO:
+            _direction still changes when there is little or no absolute velocity, it should be relatively aligned with current velocity vector until it reaches 0
+
+        */
         const WIDTH = 640
         const HEIGHT = 360
         const app = new PIXI.Application();
         await app.init({ width: WIDTH, height: HEIGHT });
         await PIXI.Assets.load('../assets/temp_car.png');
-        let sprite = PIXI.Sprite.from('../assets/temp_car.png');
-        let wh = sprite.getSize()
-        const CAR_WIDTH = 64
-        sprite.setSize(CAR_WIDTH,CAR_WIDTH*wh.height/wh.width)
-        app.stage.addChild(sprite);
+        let tempSprite = PIXI.Sprite.from('../assets/temp_car.png');
         document.body.appendChild(app.canvas);
+        const CAR_WIDTH = 64
+        const DRAG = 0.95
+        let cars = []
+        const MOVE_MULTIPLIER = 0.2
+        let toRadian = x=>x/180*Math.PI
+        let toDegree = x=>x/Math.PI*180
+        class Car{
+            accX=0;
+            accY=0;
+            velX=0;
+            velY=0;
+            posX=0
+            posY=0
+            directionOffset=90
+            _direction=0
+            lastDirection=0
+            get direction(){
+                return this._direction+this.directionOffset //in order to use rotated sprites
+            }
+            set direction(val){
+               return this._direction=val-this.directionOffset
+            }
+            inScene=false;
+            _sprite;
+            ratio;
+            get sprite(){
+                return this._sprite
+            }
+            set sprite(currSprite){
+                if(this._sprite)app.stage.removeChild(this._sprite)
+                this._sprite=currSprite
+                if(!this.inScene){
+                    this.inScene=true
+                }
+                let wh = tempSprite.getSize()    
+                console.log("wh",wh)    
+                this.ratio=wh.height/wh.width
+                currSprite.setSize(CAR_WIDTH,CAR_WIDTH*this.ratio)
+                currSprite.anchor.set(0.5,0.5)
+                app.stage.addChild(currSprite)
+                currSprite.x=100
+                currSprite.y=100
+            }
+            absoluteVel(){
+                return Math.sqrt(this.velX**2+this.velY**2)
+            }
+            tick(dt){
+                const WHEEL_DIST_RATIO = 0.8
+                this.velX+=this.accX*dt;
+                this.velY+=this.accY*dt
+                let diffX = this.velX*dt
+                let diffY = this.velY*dt
+                //console.info(dt,this.direction,this.posX,this.posY,this.velX,this.velY,this.accX,this.accY)
+                let absVel = this.absoluteVel()
+                let nextAngle;
+                if(absVel==0){
+                    nextAngle=this.lastDirection
+                    this._direction=this.lastDirection
+                }else nextAngle=toDegree(Math.atan2(this.velY,this.velX))
+                let nextX = this.velX*Math.sqrt(DRAG)
+                let nextY = this.velY*Math.sqrt(DRAG)
+                let diffDegree = nextAngle-this.sprite.angle
+                this.sprite.angle=nextAngle
+                this.posX+=diffX;
+                this.posY+=diffY
+                this.sprite.x=this.posX
+                this.sprite.y=this.posY
+                this.accX*=DRAG*dt
+                this.accY*=DRAG*dt
+                console.log(this.velX,this.velY,absVel,this._direction,this.lastDirection,this.sprite.angle,nextAngle)
+                if(this.velX>0)this.velX=Math.max(0,nextX)
+                else this.velX=Math.min(0,nextX)
+                if(this.velY>0)this.velY=Math.max(0,nextY)
+                else this.velY=Math.min(0,nextY)
+                if(absVel<0.001){
+                    this.lastDirection=this._direction
+                    this.velX=0
+                    this.velY=0
+                }
+            }
+            moveForward(){
+                console.count("forward")
+                let degree = this._direction
+                let radian = Math.PI*degree/180
+                this.accX+=Math.cos(radian)*MOVE_MULTIPLIER
+                this.accY+=Math.sin(radian)*MOVE_MULTIPLIER
+            }
+            moveBackwards(){
+                console.count("backward")
+                let degree = this._direction
+                let radian = Math.PI*degree/180
+                this.accX+=-Math.cos(radian)*MOVE_MULTIPLIER
+                this.accY+=-Math.sin(radian)*MOVE_MULTIPLIER
+                console.log(this.accX,this.accY)
+            }
+            constructor(){
+                cars.push(this)
+            }
+        }
+        class MainCar extends Car{
+            constructor(){
+                super()
+                this.sprite=tempSprite
+            }
+        }   
+        let mainCar = new MainCar()
+        const ticker = PIXI.Ticker.system
+        //testing section, will be deleted
+        let counter=0
+        let isDown = {}
+        window.addEventListener("keydown", (event) => {
+            const isLetter = /^[a-zA-Z]$/.test(event.key);
+            if(isLetter&&!event.repeat){
+                isDown[event.key.toUpperCase()]=1
+            }
+        });
+        window.addEventListener("keyup", (event) => {
+            delete isDown[event.key.toUpperCase()]
+        });
+        ticker.add(dt=>{
+            cars.forEach(car=>{
+                if(isDown["W"]||isDown["A"]||isDown["D"]||isDown["S"]){
+                    if(isDown["W"]){
+                        if(isDown["W"]==1||1)car.moveForward()
+                        else if(isDown["W"]%3==0)car.moveForward()
+                        isDown["W"]++
+                    }
+                    if(isDown["S"]){
+                        car.moveBackwards()
+                    }
+                    if(car.absoluteVel()>0.01){
+                        if(isDown["A"]){
+                            if(isDown["A"]++%10==1){
+                                console.count("left")
+                                car.direction-=10
+                            }
+                        }
+                        if(isDown["D"]){
+                            if(isDown["D"]++%10==1){
+                                console.count("right")
+                                car.direction+=10
+                            }
+                        }
+                    }
+                }else{
+                    //car.direction+=(Math.random()-0.4)*3
+                    //if(Math.random()>0.5)car.moveForward()
+                }
+                car.tick(dt.deltaTime)
+            })
+        })
       </script>
   </body>
 </html>
