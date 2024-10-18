@@ -1,13 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <title>YZG</title>
   </head>
   <body>
+    <!-- PixiJS ve TensorFlowJS kütüphaneleri eklendi -->
     <script src="https://pixijs.download/release/pixi.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
     <script type="module">
-        /*
+      /*
         TODO:
             _direction still changes when there is little or no absolute velocity, it should be relatively aligned with current velocity vector as long as it is moving forward
             reversing should also alter steering
@@ -15,211 +16,234 @@
             there should be separate velocities for cars' internal speed and external forces, currently a crash from side would cause the car to turn
             there should be an array per sprite to determine the bounding rectangle (eg. [0.2,0.8,0.3,0.8] should make the collision detector use 120x40 of an 200x80 image, the elements are ordered as: startX, endX, startY, endY)
         */
-        const WIDTH = 800
-        const HEIGHT = 600
-        const app = new PIXI.Application();
-        const {BitmapText} = PIXI
-        await app.init({ width: WIDTH, height: HEIGHT });
-        await PIXI.Assets.load('../assets/temp_car.png');
-        let sleep = ms=>new Promise(res=>setTimeout(res,ms))
-        let tempSprite = PIXI.Sprite.from('../assets/temp_car.png');
-        document.body.appendChild(app.canvas);
-        const CAR_WIDTH = 64
-        const DRAG = 4 // increases drag when increased, was meant to decrease
-        const TURN_DRAG = 0.7 // 0-1.0
-        let cars = []
-        const MOVE_MULTIPLIER = 600 // should be increased when drag is increased
-        let toRadian = x=>x/180*Math.PI
-        let getMagnitude = (...arr)=>Math.sqrt(arr.reduce((x,y)=>x+y**2,0))
-        let toDegree = x=>x/Math.PI*180
-        class Car{
-            accX=0;
-            accY=0;
-            velX=0;
-            velY=0;
-            prevVelX=0
-            prevVelY=0
-            posX=0
-            posY=0
-            directionOffset=90 // direction of the sprite is used, should normally be dynamic
-            _direction=0
-            lastDirection=0
-            allowChange=false
-            get direction(){
-                return this._direction+this.directionOffset //in order to use rotated sprites
-            }
-            set direction(val){
-                this.allowChange=true
-                return this._direction=val-this.directionOffset
-            }
-            inScene=false;
-            _sprite;
-            ratio;
-            get sprite(){
-                return this._sprite
-            }
-            set sprite(currSprite){
-                if(this._sprite)app.stage.removeChild(this._sprite)
-                this._sprite=currSprite
-                if(!this.inScene){
-                    this.inScene=true
-                }
-                let wh = tempSprite.getSize()    
-                console.log("wh",wh)    
-                this.ratio=wh.height/wh.width
-                currSprite.setSize(CAR_WIDTH,CAR_WIDTH*this.ratio)
-                currSprite.anchor.set(0.3,0.5)
-                app.stage.addChild(currSprite)
-                currSprite.x=100
-                currSprite.y=100
-            }
-            absoluteVel(usePrevious){
-                if(usePrevious)return getMagnitude(this.prevVelX,this.prevVelY)
-                return getMagnitude(this.velX,this.velY)
-            }
-            absoluteAcc(){
-                return Math.sqrt(this.accX**2+this.accY**2)
-            }
-            c=0
-            tick(dt){
-                this.velX+=this.accX*(dt);
-                this.velY+=this.accY*(dt)
-                let nextVelY = this.velY*DRAG*(dt)
-                let nextVelX = this.velX*DRAG*(dt)
-                this.accX=(nextVelX-this.velX)*DRAG
-                this.accY=(nextVelY-this.velY)*DRAG
-                let diffX = this.velX*dt
-                let diffY = this.velY*dt
-                let absVel = this.absoluteVel()
-                let absAcc = this.absoluteAcc()
-                //console.info(dt,absAcc/dt,this.accX,this.accY)
-                let nextAngle;
-                if(absVel==0){
-                    nextAngle=this.lastDirection
-                }else nextAngle=toDegree(Math.atan2(this.velY,this.velX))
-                this.posX+=diffX;
-                this.posY+=diffY
-                this.sprite.x=this.posX
-                this.sprite.y=this.posY
-                if(this.c++<1000)console.log(this.velX,this.velY,this.accX,this.accY)
-                this.prevVelX=this.velX
-                this.prevVelY=this.velY
-                this.sprite.angle=nextAngle
-                if(this._direction!=this.sprite.angle){
-                    nextAngle=this._direction
-                    this.accX*=TURN_DRAG
-                    this.accY*=TURN_DRAG
-                    this.sprite.angle=nextAngle
+      // Oyun ekranı boyutları
+      const WIDTH = 800;
+      const HEIGHT = 600;
 
-                }else{
-                    this._direction=nextAngle
-                }
-                if(absVel<0.01){
-                    this.lastDirection=this._direction
-                    this.velX=0
-                    this.velY=0
-                }
-                if(absAcc<0.001){
-                    this.accX=0
-                    this.accY=0
-                }
-                this.allowChange=false
-            }
-            hasReversed=false
-            moveForward(){
-                console.count("forward")
-                let degree = this._direction
-                let radian = Math.PI*degree/180
-                this.accX+=Math.cos(radian)*MOVE_MULTIPLIER
-                this.accY+=Math.sin(radian)*MOVE_MULTIPLIER
-                if(this.hasReversed){
-                    this.hasReversed=false
-                    this.allowChange=true
-                }
-            }
-            moveBackwards(){
-                console.count("backward")
-                let degree = this._direction
-                let radian = Math.PI*degree/180
-                this.accX+=-Math.cos(radian)*MOVE_MULTIPLIER/2
-                this.accY+=-Math.sin(radian)*MOVE_MULTIPLIER/2
-                console.log(this.accX,this.accY)
-                this.allowChange=true
-                this.hasReversed=true
-            }
-            constructor(){
-                cars.push(this)
-            }
+      const app = new PIXI.Application();
+
+      const { BitmapText } = PIXI;
+
+      await app.init({ width: WIDTH, height: HEIGHT });
+      await PIXI.Assets.load("../assets/temp_car.png");
+
+      let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+      let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
+      document.body.appendChild(app.canvas);
+
+      // Araç özellikleri
+      const CAR_WIDTH = 64;
+      const DRAG = 4; // increases drag when increased, was meant to decrease
+      const TURN_DRAG = 0.7; // 0-1.0
+      let cars = [];
+      const MOVE_MULTIPLIER = 600; // should be increased when drag is increased
+
+      let toRadian = (x) => (x / 180) * Math.PI;
+      let getMagnitude = (...arr) =>
+        Math.sqrt(arr.reduce((x, y) => x + y ** 2, 0));
+      let toDegree = (x) => (x / Math.PI) * 180;
+      class Car {
+        accX = 0;
+        accY = 0;
+        velX = 0;
+        velY = 0;
+        prevVelX = 0;
+        prevVelY = 0;
+        posX = 0;
+        posY = 0;
+        directionOffset = 90; // direction of the sprite is used, should normally be dynamic
+        _direction = 0;
+        lastDirection = 0;
+        allowChange = false;
+        get direction() {
+          return this._direction + this.directionOffset; //in order to use rotated sprites
         }
-        class MainCar extends Car{
-            constructor(){
-                super()
-                this.sprite=tempSprite
+        set direction(val) {
+          this.allowChange = true;
+          return (this._direction = val - this.directionOffset);
+        }
+        inScene = false;
+        _sprite;
+        ratio;
+        get sprite() {
+          return this._sprite;
+        }
+        set sprite(currSprite) {
+          if (this._sprite) app.stage.removeChild(this._sprite);
+          this._sprite = currSprite;
+          if (!this.inScene) {
+            this.inScene = true;
+          }
+          let wh = tempSprite.getSize();
+          console.log("wh", wh);
+          this.ratio = wh.height / wh.width;
+          currSprite.setSize(CAR_WIDTH, CAR_WIDTH * this.ratio);
+          currSprite.anchor.set(0.3, 0.5);
+          app.stage.addChild(currSprite);
+          currSprite.x = 100;
+          currSprite.y = 100;
+        }
 
-            }
-        }   
-        let mainCar = new MainCar()
+        // Hız büyüklüğünü hesaplayan fonksiyon
+        absoluteVel(usePrevious) {
+          if (usePrevious) return getMagnitude(this.prevVelX, this.prevVelY);
+          return getMagnitude(this.velX, this.velY);
+        }
+        // İvme büyüklüğünü hesaplayan fonksiyon
+        absoluteAcc() {
+          return Math.sqrt(this.accX ** 2 + this.accY ** 2);
+        }
+        c = 0;
+        tick(dt) {
+          this.velX += this.accX * dt;
+          this.velY += this.accY * dt;
+          let nextVelY = this.velY * DRAG * dt;
+          let nextVelX = this.velX * DRAG * dt;
+          this.accX = (nextVelX - this.velX) * DRAG;
+          this.accY = (nextVelY - this.velY) * DRAG;
+          let diffX = this.velX * dt;
+          let diffY = this.velY * dt;
+          let absVel = this.absoluteVel();
+          let absAcc = this.absoluteAcc();
+          //console.info(dt,absAcc/dt,this.accX,this.accY)
+          let nextAngle;
+          if (absVel == 0) {
+            nextAngle = this.lastDirection;
+          } else nextAngle = toDegree(Math.atan2(this.velY, this.velX));
+          this.posX += diffX;
+          this.posY += diffY;
+          this.sprite.x = this.posX;
+          this.sprite.y = this.posY;
+          if (this.c++ < 1000)
+            console.log(this.velX, this.velY, this.accX, this.accY);
+          this.prevVelX = this.velX;
+          this.prevVelY = this.velY;
+          this.sprite.angle = nextAngle;
+          if (this._direction != this.sprite.angle) {
+            nextAngle = this._direction;
+            this.accX *= TURN_DRAG;
+            this.accY *= TURN_DRAG;
+            this.sprite.angle = nextAngle;
+          } else {
+            this._direction = nextAngle;
+          }
+          if (absVel < 0.01) {
+            this.lastDirection = this._direction;
+            this.velX = 0;
+            this.velY = 0;
+          }
+          if (absAcc < 0.001) {
+            this.accX = 0;
+            this.accY = 0;
+          }
+          this.allowChange = false;
+        }
+        hasReversed = false;
 
-        const ticker = PIXI.Ticker.system
-        //testing section, will be deleted
-        let frameTimes=[]
-        let isDown = {}
-        window.addEventListener("keydown", (event) => {
-            const isLetter = /^[a-zA-Z]$/.test(event.key);
-            if(isLetter&&!event.repeat){
-                isDown[event.key.toUpperCase()]=1
+        // İleri hareket fonksiyonu
+        moveForward() {
+          console.count("forward");
+          let degree = this._direction;
+          let radian = (Math.PI * degree) / 180;
+          this.accX += Math.cos(radian) * MOVE_MULTIPLIER;
+          this.accY += Math.sin(radian) * MOVE_MULTIPLIER;
+          if (this.hasReversed) {
+            this.hasReversed = false;
+            this.allowChange = true;
+          }
+        }
+
+        // Geri hareket fonksiyonu
+        moveBackwards() {
+          console.count("backward");
+          let degree = this._direction;
+          let radian = (Math.PI * degree) / 180;
+          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2;
+          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2;
+          console.log(this.accX, this.accY);
+          this.allowChange = true;
+          this.hasReversed = true;
+        }
+        constructor() {
+          cars.push(this);
+        }
+      }
+
+      // Ana araç sınıfı
+      class MainCar extends Car {
+        constructor() {
+          super();
+          this.sprite = tempSprite;
+        }
+      }
+      let mainCar = new MainCar();
+
+      const ticker = PIXI.Ticker.system;
+      //testing section, will be deleted
+      let frameTimes = [];
+      let isDown = {};
+
+      // Klavye olayları
+      window.addEventListener("keydown", (event) => {
+        const isLetter = /^[a-zA-Z]$/.test(event.key);
+        if (isLetter && !event.repeat) {
+          isDown[event.key.toUpperCase()] = 1;
+        }
+      });
+      window.addEventListener("keyup", (event) => {
+        delete isDown[event.key.toUpperCase()];
+      });
+      let frameText = "0";
+      let counter = 0;
+      ticker.add((dt) => {
+        if (counter++ % 1 == 0)
+          cars.forEach((car) => {
+            if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]) {
+              if (isDown["W"]) {
+                car.moveForward();
+              }
+              if (isDown["S"]) {
+                car.moveBackwards();
+              }
+              if (isDown["A"]) {
+                console.count("left");
+                car.direction--;
+              }
+              if (isDown["D"]) {
+                console.count("right");
+                car.direction++;
+              }
+            } else {
+              //car.direction+=(Math.random()-0.4)*3
+              //if(Math.random()>0.5)car.moveForward()
             }
-        });
-        window.addEventListener("keyup", (event) => {
-            delete isDown[event.key.toUpperCase()]
-        });
-        let frameText = "0"
-        let counter = 0
-        ticker.add(dt=>{
-            if(counter++%1==0)
-            cars.forEach(car=>{
-                if(isDown["W"]||isDown["A"]||isDown["D"]||isDown["S"]){
-                    if(isDown["W"]){
-                        car.moveForward()
-                    }
-                    if(isDown["S"]){
-                        car.moveBackwards()
-                    }
-                    if(isDown["A"]){
-                        console.count("left")
-                        car.direction--
-                    }
-                    if(isDown["D"]){
-                        console.count("right")
-                        car.direction++
-                    }
-                }else{
-                    //car.direction+=(Math.random()-0.4)*3
-                    //if(Math.random()>0.5)car.moveForward()
-                }
-                car.tick(dt.deltaMS/1000)
-            })
-            frameTimes.push(Date.now())
-        })
-        const bitmapFontText = new BitmapText({
+            car.tick(dt.deltaMS / 1000);
+          });
+        frameTimes.push(Date.now());
+      });
+
+      // FPS Sayacı
+      const bitmapFontText = new BitmapText({
         text: frameText,
         style: {
-            fontFamily: 'Desyrel',
-            fontSize: 20,
-            align: 'left',
+          fontFamily: "Desyrel",
+          fontSize: 20,
+          align: "left",
         },
-    });
+      });
 
-    bitmapFontText.x = 300;
-    bitmapFontText.y = 0;
+      bitmapFontText.x = 300;
+      bitmapFontText.y = 0;
 
-    app.stage.addChild(bitmapFontText);
-        setInterval(()=>{
-            let now = Date.now()
-            frameTimes=frameTimes.filter(e=>now-e<1000)
-            frameText=frameTimes.length.toString()
-            bitmapFontText.text=frameText
-        },1000)
-      </script>
+      app.stage.addChild(bitmapFontText);
+
+      // FPS Hesaplama
+      setInterval(() => {
+        let now = Date.now();
+        frameTimes = frameTimes.filter((e) => now - e < 1000);
+        frameText = frameTimes.length.toString();
+        bitmapFontText.text = frameText;
+      }, 1000);
+    </script>
   </body>
 </html>
