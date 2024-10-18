@@ -11,8 +11,6 @@
       /*
         TODO:
             _direction still changes when there is little or no absolute velocity, it should be relatively aligned with current velocity vector as long as it is moving forward
-            reversing should also alter steering
-                reversing property could be dependent on direction and internal velocity or moveBackwards could set the property, it should be reset to false after stopping if the latter is chosen
             there should be separate velocities for cars' internal speed and external forces, currently a crash from side would cause the car to turn
             there should be an array per sprite to determine the bounding rectangle (eg. [0.2,0.8,0.3,0.8] should make the collision detector use 120x40 of an 200x80 image, the elements are ordered as: startX, endX, startY, endY)
         */
@@ -41,6 +39,12 @@
       let toRadian = (x) => (x / 180) * Math.PI;
       let getMagnitude = (...arr) =>
         Math.sqrt(arr.reduce((x, y) => x + y ** 2, 0));
+      let toVector = x=>[Math.cos(toRadian(x)),Math.sin(toRadian(x))]
+      let dotProduct = (x,y)=>{
+        let product = 0
+        for(let i = 0;i<x.length;i++)product+=x[i]*y[i]
+        return product
+      }
       let toDegree = (x) => (x / Math.PI) * 180;
       class Car {
         accX = 0;
@@ -54,12 +58,10 @@
         directionOffset = 90; // direction of the sprite is used, should normally be dynamic
         _direction = 0;
         lastDirection = 0;
-        allowChange = false;
         get direction() {
           return this._direction + this.directionOffset; //in order to use rotated sprites
         }
         set direction(val) {
-          this.allowChange = true;
           return (this._direction = val - this.directionOffset);
         }
         inScene = false;
@@ -115,7 +117,6 @@
           this.sprite.x = this.posX;
           this.sprite.y = this.posY;
           if (this.c++ < 1000)
-            console.log(this.velX, this.velY, this.accX, this.accY);
           this.prevVelX = this.velX;
           this.prevVelY = this.velY;
           this.sprite.angle = nextAngle;
@@ -136,33 +137,38 @@
             this.accX = 0;
             this.accY = 0;
           }
-          this.allowChange = false;
         }
         hasReversed = false;
 
         // İleri hareket fonksiyonu
         moveForward() {
-          console.count("forward");
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
           this.accX += Math.cos(radian) * MOVE_MULTIPLIER;
           this.accY += Math.sin(radian) * MOVE_MULTIPLIER;
           if (this.hasReversed) {
             this.hasReversed = false;
-            this.allowChange = true;
           }
         }
 
         // Geri hareket fonksiyonu
-        moveBackwards() {
-          console.count("backward");
+        moveBackwards(){
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
           this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2;
           this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2;
-          console.log(this.accX, this.accY);
           this.allowChange = true;
-          this.hasReversed = true;
+        }
+        isGoingBackwards(){
+            return dotProduct([this.velX,this.velY],toVector(this.sprite.angle))<0
+        }
+        steerLeft(){
+            if(this.isGoingBackwards())return this.direction++
+            this.direction--
+        }
+        steerRight(){
+            if(this.isGoingBackwards())return this.direction--
+            this.direction++
         }
         constructor() {
           cars.push(this);
@@ -206,12 +212,10 @@
                 car.moveBackwards();
               }
               if (isDown["A"]) {
-                console.count("left");
-                car.direction--;
+                car.steerLeft()
               }
               if (isDown["D"]) {
-                console.count("right");
-                car.direction++;
+                car.steerRight()
               }
             } else {
               //car.direction+=(Math.random()-0.4)*3
