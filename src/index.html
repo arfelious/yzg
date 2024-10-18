@@ -12,6 +12,9 @@
         TODO:
             there should be separate velocities for cars' internal speed and external forces, currently a crash from side would cause the car to turn
             there should be an array per sprite to determine the bounding rectangle (eg. [0.2,0.8,0.3,0.8] should make the collision detector use 120x40 of an 200x80 image, the elements are ordered as: startX, endX, startY, endY)
+              collision detection
+                collision resolution
+            road sprites, road signs, different cars
         */
       // Oyun ekranı boyutları
       const WIDTH = 800;
@@ -134,18 +137,18 @@
           }
         }
         // İleri hareket fonksiyonu
-        moveForward() {
+        moveForward(scale=1) { // 0-1.0, will necessary to control acceleration
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
-          this.accX += Math.cos(radian) * MOVE_MULTIPLIER;
-          this.accY += Math.sin(radian) * MOVE_MULTIPLIER;
+          this.accX += Math.cos(radian) * MOVE_MULTIPLIER*scale;
+          this.accY += Math.sin(radian) * MOVE_MULTIPLIER*scale;
         }
         // Geri hareket fonksiyonu
-        moveBackwards(){
+        moveBackwards(scale=1){
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
-          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2;
-          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2;
+          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
+          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
           this.allowChange = true;
         }
         isGoingBackwards(){
