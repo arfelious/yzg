@@ -28,7 +28,7 @@
         const DRAG = 4 // increases drag when increased, was meant to decrease
         const TURN_DRAG = 0.7 // 0-1.0
         let cars = []
-        const MOVE_MULTIPLIER = 500 // should be increased when drag is increased
+        const MOVE_MULTIPLIER = 600 // should be increased when drag is increased
         let toRadian = x=>x/180*Math.PI
         let getMagnitude = (...arr)=>Math.sqrt(arr.reduce((x,y)=>x+y**2,0))
         let toDegree = x=>x/Math.PI*180
@@ -105,7 +105,7 @@
                 this.prevVelX=this.velX
                 this.prevVelY=this.velY
                 this.sprite.angle=nextAngle
-                if(this._direction!=this.sprite.angle&&(this.allowChange||1)){
+                if(this._direction!=this.sprite.angle){
                     nextAngle=this._direction
                     this.accX*=TURN_DRAG
                     this.accY*=TURN_DRAG
@@ -141,8 +141,8 @@
                 console.count("backward")
                 let degree = this._direction
                 let radian = Math.PI*degree/180
-                this.accX+=-Math.cos(radian)*MOVE_MULTIPLIER
-                this.accY+=-Math.sin(radian)*MOVE_MULTIPLIER
+                this.accX+=-Math.cos(radian)*MOVE_MULTIPLIER/2
+                this.accY+=-Math.sin(radian)*MOVE_MULTIPLIER/2
                 console.log(this.accX,this.accY)
                 this.allowChange=true
                 this.hasReversed=true
