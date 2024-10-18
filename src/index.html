@@ -21,7 +21,7 @@
       const HEIGHT = 600;
       const app = new PIXI.Application();
       const { BitmapText } = PIXI;
-      await app.init({ width: WIDTH, height: HEIGHT });
+      await app.init({ width: WIDTH, height: HEIGHT, antialias: true});
       await PIXI.Assets.load("../assets/temp_car.png");
 
       let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
