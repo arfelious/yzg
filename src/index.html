@@ -15,6 +15,10 @@
               collision detection
                 collision resolution
             road sprites, road signs, different cars
+            frame independent acceleration, use deltaTime
+            angle based steering option
+        MAYBE:
+          visualize buttons as they are being pressed, might be necessary when RL model is used
         */
       // Oyun ekranı boyutları
       const WIDTH = 800;
@@ -33,8 +37,9 @@
       const CAR_WIDTH = 64;
       const DRAG = 4.4; // increases drag when increased, was meant to decrease
       const TURN_DRAG = 0.8; // 0-1.0
-      const MOVE_MULTIPLIER = 600; // acceleration, should be increased when drag is increased
+      const MOVE_MULTIPLIER = 700; // acceleration, should be increased when drag is increased
       const MIN_STEERING_SPEED = 10
+      const STEERING_MULTIPLIER = 1
       let toRadian = (x) => (x / 180) * Math.PI;
       let getMagnitude = (...arr) =>
         Math.sqrt(arr.reduce((x, y) => x + y ** 2, 0));
@@ -55,6 +60,7 @@
         directionOffset = 90; // direction of the sprite is used, should normally be dynamic
         _direction = 0;
         lastDirection = 0;
+        isUsingBrake=false
         get direction() {
           return this._direction + this.directionOffset; //in order to use rotated sprites
         }
@@ -135,6 +141,7 @@
             this.accX = 0;
             this.accY = 0;
           }
+          this.isUsingBrake=false
         }
         // İleri hareket fonksiyonu
         moveForward(scale=1) { // 0-1.0, will necessary to control acceleration
@@ -149,20 +156,37 @@
           let radian = (Math.PI * degree) / 180;
           this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
           this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
-          this.allowChange = true;
         }
         isGoingBackwards(){
             return dotProduct([this.velX,this.velY],toVector(this.sprite.angle))<-0.2
         }
         steerLeft(){
-            if(this.absoluteVel()<MIN_STEERING_SPEED)return
-            if(this.isGoingBackwards())return this.direction+=0.5
-            this.direction--
+            let currentMultiplier = STEERING_MULTIPLIER
+            let isGoingBackwards = this.isGoingBackwards()
+            if(this.isUsingBrake){
+              currentMultiplier*=0.5
+            }else if(this.absoluteVel()<MIN_STEERING_SPEED)return
+            if(isGoingBackwards)return this.direction+=currentMultiplier/2
+            this.direction-=currentMultiplier
         }
         steerRight(){
-            if(this.absoluteVel()<MIN_STEERING_SPEED)return
-            if(this.isGoingBackwards())return this.direction-=0.5
-            this.direction++
+            let currentMultiplier = STEERING_MULTIPLIER
+            let isGoingBackwards = this.isGoingBackwards()
+            if(this.isUsingBrake){
+              currentMultiplier*=0.5
+            }else if(this.absoluteVel()<MIN_STEERING_SPEED)return
+            if(isGoingBackwards)return this.direction-=currentMultiplier/2
+            this.direction+=currentMultiplier
+        }
+        brake(dt){
+          this.accX*=0.95*(1-dt)
+          this.accY*=0.95*(1-dt)
+          this.velX*=0.95*(1-dt)
+          this.velY*=0.95*(1-dt)
+          this.isUsingBrake=true
+        }
+        destroy(){
+          cars.splice(cars.indexOf(this),1)
         }
         constructor() {
           cars.push(this);
@@ -185,9 +209,12 @@
 
       // Klavye olayları
       window.addEventListener("keydown", (event) => {
-        const isLetter = /^[a-zA-Z]$/.test(event.key);
+        const isLetter = /^[a-zA-Z ]$/.test(event.key);
         if (isLetter && !event.repeat) {
           isDown[event.key.toUpperCase()] = 1;
+        }
+        if(event.key==" "){
+          event.preventDefault()
         }
       });
       window.addEventListener("keyup", (event) => {
@@ -198,7 +225,11 @@
       ticker.add((dt) => {
         if (counter++ % 1 == 0)
           cars.forEach((car) => {
-            if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]) {
+            if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
+              let deltaTime = dt.deltaMS/1000
+              if (isDown[" "]) {
+                car.brake(deltaTime)
+              }
               if (isDown["W"]) {
                 car.moveForward();
               }
