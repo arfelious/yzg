@@ -18,7 +18,6 @@
             road sprites, road signs, different cars
             frame independent acceleration, use deltaTime
             angle based steering option
-            apperantly tinting does not affect cpu time at all, cars might have baked lighting based on location in the future
         MAYBE:
           visualize buttons as they are being pressed, might be necessary when RL model is used
         */
@@ -152,7 +151,7 @@
           this.accY += Math.sin(radian) * MOVE_MULTIPLIER*scale;
         }
         // Geri hareket fonksiyonu
-        moveBackwards(scale=1){
+        moveBackward(scale=1){
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
           this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
@@ -235,7 +234,7 @@
                 car.moveForward();
               }
               if (isDown["S"]) {
-                car.moveBackwards();
+                car.moveBackward();
               }
               if (isDown["A"]) {
                 car.steerLeft()
