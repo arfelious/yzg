@@ -10,13 +10,15 @@
     <script type="module">
       /*
         TODO:
+            extract pixels from sprites and find the corners ( this.app.renderer.extract.pixels(sprite) )
             there should be separate velocities for cars' internal speed and external forces, currently a crash from side would cause the car to turn
             there should be an array per sprite to determine the bounding rectangle (eg. [0.2,0.8,0.3,0.8] should make the collision detector use 120x40 of an 200x80 image, the elements are ordered as: startX, endX, startY, endY)
-              collision detection
-                collision resolution
+            collision detection
+              collision resolution
             road sprites, road signs, different cars
             frame independent acceleration, use deltaTime
             angle based steering option
+            apperantly tinting does not affect cpu time at all, cars might have baked lighting based on location in the future
         MAYBE:
           visualize buttons as they are being pressed, might be necessary when RL model is used
         */
@@ -41,8 +43,7 @@
       const MIN_STEERING_SPEED = 10
       const STEERING_MULTIPLIER = 1
       let toRadian = (x) => (x / 180) * Math.PI;
-      let getMagnitude = (...arr) =>
-        Math.sqrt(arr.reduce((x, y) => x + y ** 2, 0));
+      let getMagnitude = Math.hypot
       let toVector = x=>[Math.cos(toRadian(x)),Math.sin(toRadian(x))]
       let dotProduct = (x,y)=>{
         let product = 0
@@ -225,8 +226,8 @@
       ticker.add((dt) => {
         if (counter++ % 1 == 0)
           cars.forEach((car) => {
+            let deltaTime = dt.deltaMS/1000
             if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
-              let deltaTime = dt.deltaMS/1000
               if (isDown[" "]) {
                 car.brake(deltaTime)
               }
@@ -243,21 +244,22 @@
                 car.steerRight()
               }
             }
-            car.tick(dt.deltaMS / 1000);
+            car.tick(deltaTime);
           });
         frameTimes.push(Date.now());
       });
 
       // FPS Sayacı
+      let fpsFontSize = 20
       const bitmapFontText = new BitmapText({
         text: frameText,
         style: {
           fontFamily: "Desyrel",
-          fontSize: 20,
+          fontSize: fpsFontSize,
           align: "left",
         },
       });
-      bitmapFontText.x = 300;
+      bitmapFontText.x = (WIDTH-fpsFontSize)/2
       bitmapFontText.y = 0;
       app.stage.addChild(bitmapFontText);
       // FPS Hesaplama
@@ -266,6 +268,7 @@
         frameTimes = frameTimes.filter((e) => now - e < 1000);
         frameText = frameTimes.length.toString();
         bitmapFontText.text = frameText;
+        bitmapFontText.x=(WIDTH-fpsFontSize*frameText.length)/2
       }, 1000);
     </script>
   </body>
