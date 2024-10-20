@@ -17,7 +17,7 @@
 <h4>Yunus Emre Küpücü ✅</h4>
 <h4>Batuhan Özdemir ❌</h4>
 <h4>Elif Örs ✅</h4>
-<h4>Melisa Şimşek ❌</h4>
+<h4>Melisa Şimşek ✅</h4>
 <h4>İlayda Kaba ✅</h4>
 <h4>Deniz Toprak ❌</h4>
 <h4>Sudenaz Bilgen ❌</h4>
