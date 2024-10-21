@@ -143,20 +143,26 @@
           }
           this.isUsingBrake=false
         }
-        // İleri hareket fonksiyonu
-        moveForward(scale=1) { // 0-1.0, will necessary to control acceleration
-          let degree = this._direction;
-          let radian = (Math.PI * degree) / 180;
-          this.accX += Math.cos(radian) * MOVE_MULTIPLIER*scale;
-          this.accY += Math.sin(radian) * MOVE_MULTIPLIER*scale;
-        }
-        // Geri hareket fonksiyonu
-        moveBackward(scale=1){
-          let degree = this._direction;
-          let radian = (Math.PI * degree) / 180;
-          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
-          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
-        }
+        // İleri hareket fonksiyonu (dt ile güncellendi)
+moveForward(scale = 1, dt = 1) {
+  const degree = this._direction;
+  const radian = (Math.PI * degree) / 180;
+  const adjustedAcceleration = MOVE_MULTIPLIER * scale * dt;
+  
+  this.accX += Math.cos(radian) * adjustedAcceleration;
+  this.accY += Math.sin(radian) * adjustedAcceleration;
+}
+
+// Geri hareket fonksiyonu (dt ile güncellendi)
+moveBackward(scale = 1, dt = 1) {
+  const degree = this._direction;
+  const radian = (Math.PI * degree) / 180;
+  const adjustedAcceleration = (MOVE_MULTIPLIER / 2) * scale * dt;
+
+  this.accX += -Math.cos(radian) * adjustedAcceleration;
+  this.accY += -Math.sin(radian) * adjustedAcceleration;
+}
+
         isGoingBackwards(){
             return dotProduct([this.velX,this.velY],toVector(this.sprite.angle))<-0.2
         }
@@ -222,8 +228,9 @@
       });
       let frameText = "0";
       let counter = 0;
+
       ticker.add((dt) => {
-        if (counter++ % 1 == 0)
+
           cars.forEach((car) => {
             let deltaTime = dt.deltaMS/1000
             if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
@@ -247,6 +254,34 @@
           });
         frameTimes.push(Date.now());
       });
+
+//       ticker.add((dt) => {
+//   let deltaTime = dt.deltaMS / 1000; // Zaman aralığı saniye cinsinden
+//   cars.forEach((car) => {
+//     if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"] || isDown[" "]) {
+//       if (isDown[" "]) {
+//         car.brake(deltaTime);
+//       }
+//       if (isDown["W"]) {
+//         car.moveForward(1, deltaTime); // dt ile hareket
+//       }
+//       if (isDown["S"]) {
+//         car.moveBackward(1, deltaTime); // dt ile hareket
+//       }
+//       if (isDown["A"]) {
+//         car.steerLeft();
+//       }
+//       if (isDown["D"]) {
+//         car.steerRight();
+//       }
+//     }
+//     car.tick(deltaTime);
+//   });
+// });
+
+
+     
+
 
       // FPS Sayacı
       let fpsFontSize = 20
