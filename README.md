@@ -21,7 +21,7 @@
 <h4>İlayda Kaba ✅</h4>
 <h4>Deniz Toprak ❌</h4>
 <h4>Sudenaz Bilgen ✅</h4>
-<h4>Gülsemin Özgür ❌</h4>
+<h4>Gülsemin Özgür ✅</h4>
 <h4>Esra Ayvaz ❌</h4>
 <h4>Ayşe Afacan ❌</h4>
 <h4>Atacan Yurdaer ❌</h4>
