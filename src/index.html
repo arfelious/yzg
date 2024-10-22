@@ -10,14 +10,18 @@
     <script type="module">
       /*
         TODO:
-            extract pixels from sprites and find the corners ( this.app.renderer.extract.pixels(sprite) )
-            there should be separate velocities for cars' internal speed and external forces, currently a crash from side would cause the car to turn
-            there should be an array per sprite to determine the bounding rectangle (eg. [0.2,0.8,0.3,0.8] should make the collision detector use 120x40 of an 200x80 image, the elements are ordered as: startX, endX, startY, endY)
+            araç çok yavaşken dönme düzenlenecek, ya belli hıza göre engellenecek, ya ivmesi olması istenecek ya da dönme hızı araç hızıne veya ivmesine göre olacak
+            collision detection araçların üst kısmında tam temas olmadan çalışıyor olabilir, incelenip düzeltilmeli
+            araçların ayrı sprite'ları olmalı, sprite atamak yerine kullanılacak resmi belirtmeliyiz
+            hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
+              isUsingBrake kullanılırken TURN_DRAG değiştirilmeli
+            collidersEquals fonksiyonu yazılmalı 
+              prev array'indeki her elemanın next'te de bulunmasına bakması yeterli olur ama optimize edilebilir
+            araçların iç ve dış hız değerleri farklı olmalı. araçların yönü hızına göre belirlendiği için bir araç çarparsa araç aniden yön değiştirir, önlemek içi ayrı hız değerleri kullanılıp hesaplamalarda ikisini beraber kullanacak bi hız değeri kullanılır. direction ve _direction'da olduğu gibi getter setter kullanılmalı
+            yol sprite'ları, trafik işaretleri, farklı araçlar eklenmeli
+            fps'ten bağımsız hareket sistemi, açıya bağlı yön sisteminde de aynısı uygulandığında düzenlenerek eklenecek
             collision detection
               collision resolution
-            road sprites, road signs, different cars
-            frame independent acceleration, use deltaTime
-            angle based steering option
         MAYBE:
           visualize buttons as they are being pressed, might be necessary when RL model is used
         */
@@ -31,7 +35,9 @@
 
       let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
       let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
+      let randSprite = PIXI.Sprite.from("../assets/temp_car.png");
       document.body.appendChild(app.canvas);
+      let entities = []
       let cars = [];
 
       // Araç özellikleri
@@ -49,7 +55,56 @@
         for(let i = 0;i<x.length;i++)product+=x[i]*y[i]
         return product
       }
+      let crossProduct = (P, Q, R) => {
+        return (Q[0]-P[0])*(R[1]-P[1])-(Q[1]-P[1])*(R[0]-P[0]);
+      };
+      let getOrientation = (P, Q, R) => {
+        const val = crossProduct(P, Q, R);
+        if(val==0)return 0;
+        return val>0?1:2
+      };
+      let isOnLineSegment = (P, Q, R) => {
+        return (Q[0] < Math.max(P[0], R[0]) && Q[0] > Math.min(P[0], R[0]) &&
+                Q[1] < Math.max(P[1], R[1]) && Q[1] > Math.min(P[1], R[1]));
+      }
+      let checkIntersects = (A, B, C, D) =>{
+        const o1 = getOrientation(A,B,C);
+        const o2 = getOrientation(A,B,D);
+        const o3 = getOrientation(C,D,A);
+        const o4 = getOrientation(C,D,B);
+        if(o1 != o2 && o3 != o4) return true;
+        if(o1==0&&isOnLineSegment(A,C,B)) return true;
+        if(o2==0&&isOnLineSegment(A,D,B)) return true;
+        if(o3==0&&isOnLineSegment(C,A,D)) return true;
+        if(o4==0&&isOnLineSegment(C,B,D)) return true;
+        return false;
+      }
       let toDegree = (x) => (x / Math.PI) * 180;
+      let getBounds = sprite=>{
+        let extracted = app.renderer.extract.pixels(sprite)
+        let xMin=255,yMin=255,xMax=0,yMax=0
+        let pixels= extracted.pixels
+        let {width,height} = extracted
+        let pixelsLength = pixels.length
+        for(let i = 0;i<pixelsLength;i+=4){
+          let index = i/4
+          let x = index%width
+          let y = Math.floor(index/width)
+          let a = pixels[i+3]
+          if(a>200){
+            if(x<xMin)xMin=x
+            if(x>xMax)xMax=x
+            if(y<yMin)yMin=y
+            if(y>yMax)yMax=y
+          }
+        }
+        let retVal = [[xMin,yMin],[xMin,yMax],[xMax,yMin],[xMax,yMax]]
+        return retVal
+      }
+      let collidersEquals = (prev,next)=>{
+        //TODO
+        return false
+      }
       class Car {
         accX = 0;
         accY = 0;
@@ -61,18 +116,127 @@
         _direction = 0;
         lastDirection = 0;
         isUsingBrake=false
+        bounds;
+        scale;
+        anchorX=0.3
+        anchorY=0.5
+        graphics;
+        collisionGraphics;
+        boundingRect
+        lastColliders;
+        _fillColor=0xff9900
+        shouldDraw=false
+        // Toggles debug graphics that outlines the sprite, it should change color when the entity collides
+        createGraphics=true
+        collisionBounds
+        drawGraphics(clearRect){
+          if(!this.createGraphics)return
+          if(clearRect)this.graphics.clear()
+          this.graphics.rect(...this.boundingRect)
+          this.graphics.fill(this.fillColor)
+          if(this.collisionGraphics&&this.collisionBounds){
+            //this.collisionGraphics.clear()
+            //this.collisionGraphics.rect(...this.collisionBounds)
+            //this.collisionGraphics.fill(0x00ff00)
+          }
+        }
+        init(sprite){
+          this.bounds=getBounds(sprite)
+          let wh = sprite.getSize();
+          this.ratio = wh.height / wh.width;
+          this.scale=CAR_WIDTH/wh.width
+          sprite.setSize(CAR_WIDTH, CAR_WIDTH * this.ratio);
+          sprite.anchor.set(this.anchorX,this.anchorY);
+          this._sprite = sprite;
+          this.scaledBounds=[this.bounds[0][0],this.bounds[0][1],this.bounds[3][0]-this.bounds[0][0],this.bounds[3][1]-this.bounds[0][1]].map(e=>e*this.scale)
+          if(this.createGraphics){
+            this.graphics = new PIXI.Graphics();      
+            this.collisionGraphics= new PIXI.Graphics()
+            app.stage.addChild(this.graphics);
+            app.stage.addChild(this.collisionGraphics);
+            this.boundingRect=this.scaledBounds
+              .map((e,i)=>e-(i==0?this.sprite.width*this.anchorX:i==1?this.sprite.height*this.anchorY:0))
+            this.drawGraphics()
+          }
+        }
+        getLines(){
+          /*
+            A----B
+            |    |
+            D----C
+          */
+         let width = this.scaledBounds[2]
+         let height = this.scaledBounds[3]
+         let offset = getMagnitude(this.scaledBounds[0],this.scaledBounds[1])
+          let offsetAngleRad = Math.atan2(this.scaledBounds[0],this.scaledBounds[1])
+          let startAngleRad = toRadian(this._direction)
+          let xMultiplier = Math.cos(startAngleRad)
+          let yMultiplier = Math.sin(startAngleRad)
+          let xOffset = this.scaledBounds[0]??offset*Math.cos(offsetAngleRad+0*startAngleRad)
+          let yOffset = this.scaledBounds[1]??offset*Math.sin(offsetAngleRad+startAngleRad)
+          //Bu fonksiyon kesinlikle elden geçirilmeli. modRadian ile startAngleRad arasında fark yok, kodu bunlardan yalnızca birini kullanacak şekilde güncellemek de işe yarar
+          let anchorMagnitude = 0
+          let directionHalfRadian = toRadian(this._direction)
+          let modDegree = (this.direction%360+360)%360
+          let modRadian = toRadian(modDegree)
+          let halfWidth = width/2
+          let halfHeight = height/2
+          let cosMod = Math.cos(modRadian)
+          let sinMod = Math.sin(modRadian)
+          let cosModM180 = Math.cos(toRadian(180-this.direction))
+          //¯\_(ツ)_/¯
+          let anchorOffsetX = (modDegree<90?-width/2*cosModM180:0)+width/2*cosModM180-(modDegree>=180?halfWidth*sinMod:0)+(modDegree>=270?halfWidth*cosMod:0)
+          let anchorOffsetY = (modDegree<=90?cosMod*height:0)+(modDegree>180?-sinMod*height:0)+(modDegree>270?cosMod*height:0)
+          let A = [xOffset+anchorOffsetX,yOffset+anchorOffsetY]
+          let B = [A[0]+width*xMultiplier,A[1]+width*yMultiplier]
+          let C = [B[0]+height*Math.cos(toRadian(90)+startAngleRad),B[1]+height*Math.sin(toRadian(90)+startAngleRad)]
+          let D = [C[0]+width*Math.cos(toRadian(180)+startAngleRad),C[1]+width*Math.sin(toRadian(180)+startAngleRad)]
+          let AB = [A,B]
+          let BC = [B,C]
+          let CD = [C,D]
+          let DA = [D,A]
+          this.shouldDraw=true
+          this.collisionBounds=[Math.min(A[0],B[0],C[0],D[0]),Math.min(A[1],B[1],C[1],D[1]),Math.max(...[A,B,C,D].map((e,i,a)=>a.map(w=>Math.abs(e[0]-w[0]))).flat()),
+          Math.max(...[A,B,C,D].map((e,i,a)=>a.map(w=>Math.abs(e[1]-w[1]))).flat())]
+          .map((e,i)=>e-(i==0?this.sprite.width*this.anchorX:i==1?this.sprite.height*this.anchorY:0))
+          return [AB,BC,CD,DA].map(e=>e.map(e=>[e[0]+this.posX-this.sprite.width*this.anchorX,e[1]+this.posY-this.sprite.height*this.anchorY]))
+        }
+        setGraphics(){
+          if(this.createGraphics){
+            this.graphics.x=this.posX
+            this.graphics.y=this.posY
+            this.graphics.angle=this.sprite.angle
+            if(this.collisionGraphics&&this.collisionBounds){
+              this.collisionGraphics.x=this.posX
+              this.collisionGraphics.y=this.posY
+            }
+          }
+          if(this.shouldDraw){
+            this.drawGraphics(true)
+          }
+        }
+        set fillColor(value){
+          if(this.graphics){
+            this.graphics.fill(value)
+            this.shouldDraw=true
+          }
+          return this._fillColor=value
+        }
+        get fillColor(){
+          return this._fillColor
+        }
         get direction() {
           return this._direction + this.directionOffset; //in order to use rotated sprites
         }
         set direction(val) {
           return (this._direction = val - this.directionOffset);
         }
-        get position(){
-          return [this.posX,this.posY]
-        }
         setPosition(x,y){
           this.posX=x
           this.posY=y
+        }
+        get position(){
+          return [this.posX,this.posY]
         }
         set position(val){
           this.setPosition(val[0],val[1])
@@ -85,14 +249,10 @@
         }
         set sprite(currSprite) {
           if (this._sprite) app.stage.removeChild(this._sprite);
-          this._sprite = currSprite;
           if (!this.inScene) {
             this.inScene = true;
           }
-          let wh = tempSprite.getSize();
-          this.ratio = wh.height / wh.width;
-          currSprite.setSize(CAR_WIDTH, CAR_WIDTH * this.ratio);
-          currSprite.anchor.set(0.3, 0.5);
+          this.init(currSprite)
           app.stage.addChild(currSprite);
         }
 
@@ -103,6 +263,18 @@
         // İvme büyüklüğünü hesaplayan fonksiyon
         absoluteAcc() {
           return getMagnitude(this.accX,this.accY)
+        }
+        getColliders(){
+          let currLines = this.getLines()
+          return entities.filter(e=>{
+            if(e==this)return false
+            let entityLines = e.getLines()
+            return currLines.find(l1=>{
+              let retVal = entityLines.find(l2=>checkIntersects(...l1,...l2))
+              if(retVal&&Math.random()>0.99&&counter<1000)console.log(JSON.stringify(l1),JSON.stringify(retVal))
+              return retVal
+            })
+          })
         }
         tick(dt) {
           this.velX += this.accX * dt;
@@ -119,6 +291,11 @@
           if (absVel == 0) {
             nextAngle = this.lastDirection;
           } else nextAngle = toDegree(Math.atan2(this.velY, this.velX));
+          let nextColliders = this.getColliders()
+          if(!collidersEquals(this.lastColliders,nextColliders)||1){
+            this.fillColor=nextColliders.length==0?0xff9900:0xff0000
+          }
+          this.lastColliders=nextColliders
           this.posX += diffX;
           this.posY += diffY;
           this.sprite.x = this.posX;
@@ -143,26 +320,20 @@
           }
           this.isUsingBrake=false
         }
-        // İleri hareket fonksiyonu (dt ile güncellendi)
-moveForward(scale = 1, dt = 1) {
-  const degree = this._direction;
-  const radian = (Math.PI * degree) / 180;
-  const adjustedAcceleration = MOVE_MULTIPLIER * scale * dt;
-  
-  this.accX += Math.cos(radian) * adjustedAcceleration;
-  this.accY += Math.sin(radian) * adjustedAcceleration;
-}
-
-// Geri hareket fonksiyonu (dt ile güncellendi)
-moveBackward(scale = 1, dt = 1) {
-  const degree = this._direction;
-  const radian = (Math.PI * degree) / 180;
-  const adjustedAcceleration = (MOVE_MULTIPLIER / 2) * scale * dt;
-
-  this.accX += -Math.cos(radian) * adjustedAcceleration;
-  this.accY += -Math.sin(radian) * adjustedAcceleration;
-}
-
+        // İleri hareket fonksiyonu
+        moveForward(scale=1) { // 0-1.0, will necessary to control acceleration
+          let degree = this._direction;
+          let radian = (Math.PI * degree) / 180;
+          this.accX += Math.cos(radian) * MOVE_MULTIPLIER*scale;
+          this.accY += Math.sin(radian) * MOVE_MULTIPLIER*scale;
+        }
+        // Geri hareket fonksiyonu
+        moveBackward(scale=1){
+          let degree = this._direction;
+          let radian = (Math.PI * degree) / 180;
+          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
+          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
+        }
         isGoingBackwards(){
             return dotProduct([this.velX,this.velY],toVector(this.sprite.angle))<-0.2
         }
@@ -185,16 +356,17 @@ moveBackward(scale = 1, dt = 1) {
             this.direction+=currentMultiplier
         }
         brake(dt){
-          this.accX*=0.95*(1-dt)
-          this.accY*=0.95*(1-dt)
-          this.velX*=0.95*(1-dt)
-          this.velY*=0.95*(1-dt)
+          this.accX*=0.9**(1-dt)
+          this.accY*=0.9**(1-dt)
+          this.velX*=0.9**(1-dt)
+          this.velY*=0.9**(1-dt)
           this.isUsingBrake=true
         }
         destroy(){
           cars.splice(cars.indexOf(this),1)
         }
         constructor() {
+          entities.push(this)
           cars.push(this);
         }
       }
@@ -203,11 +375,16 @@ moveBackward(scale = 1, dt = 1) {
       class MainCar extends Car {
         constructor() {
           super();
+          this.createGraphics=true
           this.sprite = tempSprite;
         }
       }
       let mainCar = new MainCar();
+      window.mainCar=mainCar
       mainCar.setPosition(50,50)
+      let randCar = new Car()
+      randCar.sprite=randSprite
+      randCar.setPosition(200,50)
       const ticker = PIXI.Ticker.system;
       //testing section, will be deleted
       let frameTimes = [];
@@ -228,59 +405,33 @@ moveBackward(scale = 1, dt = 1) {
       });
       let frameText = "0";
       let counter = 0;
-
       ticker.add((dt) => {
-
-          cars.forEach((car) => {
-            let deltaTime = dt.deltaMS/1000
-            if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
+        if(counter++%1==0){
+          let deltaTime = dt.deltaMS/1000
+          if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
               if (isDown[" "]) {
-                car.brake(deltaTime)
+                mainCar.brake(deltaTime)
               }
               if (isDown["W"]) {
-                car.moveForward();
+                mainCar.moveForward();
               }
               if (isDown["S"]) {
-                car.moveBackward();
+                mainCar.moveBackward();
               }
               if (isDown["A"]) {
-                car.steerLeft()
+                mainCar.steerLeft()
               }
               if (isDown["D"]) {
-                car.steerRight()
+                mainCar.steerRight()
               }
             }
+          cars.forEach((car) => {
             car.tick(deltaTime);
           });
-        frameTimes.push(Date.now());
+          entities.forEach(e=>e.setGraphics())
+          frameTimes.push(Date.now());
+        }
       });
-
-//       ticker.add((dt) => {
-//   let deltaTime = dt.deltaMS / 1000; // Zaman aralığı saniye cinsinden
-//   cars.forEach((car) => {
-//     if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"] || isDown[" "]) {
-//       if (isDown[" "]) {
-//         car.brake(deltaTime);
-//       }
-//       if (isDown["W"]) {
-//         car.moveForward(1, deltaTime); // dt ile hareket
-//       }
-//       if (isDown["S"]) {
-//         car.moveBackward(1, deltaTime); // dt ile hareket
-//       }
-//       if (isDown["A"]) {
-//         car.steerLeft();
-//       }
-//       if (isDown["D"]) {
-//         car.steerRight();
-//       }
-//     }
-//     car.tick(deltaTime);
-//   });
-// });
-
-
-     
 
 
       // FPS Sayacı
