@@ -10,7 +10,6 @@
     <script type="module">
       /*
         TODO:
-            araç çok yavaşken dönme düzenlenecek, ya belli hıza göre engellenecek, ya ivmesi olması istenecek ya da dönme hızı araç hızıne veya ivmesine göre olacak
             araçların ayrı sprite'ları olmalı, sprite atamak yerine kullanılacak resmi belirtmeliyiz
             hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
               isUsingBrake kullanılırken TURN_DRAG değiştirilmeli
@@ -43,11 +42,15 @@
       const DRAG = 4.4; // increases drag when increased, was meant to decrease
       const TURN_DRAG = 0.8; // 0-1.0
       const MOVE_MULTIPLIER = 700; // acceleration, should be increased when drag is increased
-      const MIN_STEERING_SPEED = 10
-      const STEERING_MULTIPLIER = 1
+      const STEERING_MULTIPLIER = 0.75
+      const MIN_ALIGNMENT = 0.7
       let toRadian = (x) => (x / 180) * Math.PI;
       let getMagnitude = Math.hypot
       let toVector = x=>[Math.cos(toRadian(x)),Math.sin(toRadian(x))]
+      let toUnitVector = x=>{
+        let length = getMagnitude(x[0],x[1])
+        return [x[0]/length,x[1]/length]
+      }
       let dotProduct = (x,y)=>{
         let product = 0
         for(let i = 0;i<x.length;i++)product+=x[i]*y[i]
@@ -137,8 +140,7 @@
             this.lines.forEach((e,i)=>{
               let line = lines[i]
               e.clear()
-              e.lineStyle(1, 0x099ff)
-                .moveTo(line[0][0],line[0][1])
+              e.moveTo(line[0][0],line[0][1])
                 .lineTo(line[1][0],line[1][1]).stroke();
             })
           }
@@ -155,7 +157,10 @@
           if(this.createGraphics){
             this.graphics = new PIXI.Graphics();   
             this.lines=Array(4).fill().map(()=>new PIXI.Graphics())
-            this.lines.forEach(e=>app.stage.addChild(e))   
+            this.lines.forEach(e=>{
+              e.setStrokeStyle(1, 0x099ff)
+              app.stage.addChild(e)
+              })   
             this.collisionGraphics= new PIXI.Graphics()
             app.stage.addChild(this.graphics);
             app.stage.addChild(this.collisionGraphics);
@@ -323,26 +328,30 @@
           this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
           this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
         }
-        isGoingBackwards(){
-            return dotProduct([this.velX,this.velY],toVector(this.sprite.angle))<-0.2
+        getAlignment(){
+          return dotProduct(toUnitVector([this.velX,this.velY]),toVector(this._direction))
+        }
+        isGoingBackwards(alignment=getAlignment()){
+            return alignment<0
+        }
+        steer(angle) {
+          let currentMultiplier = STEERING_MULTIPLIER;
+          let alignment = this.getAlignment()
+          let isGoingBackwards = this.isGoingBackwards(alignment);
+          if(Math.abs(alignment)<MIN_ALIGNMENT)return
+          if (this.isUsingBrake) {
+              currentMultiplier *= 0.5;
+          } 
+          if (isGoingBackwards) {
+              currentMultiplier*=-0.7 // - yön için, 0.7 daha az dönmesi için
+          } 
+          this.direction += angle * currentMultiplier;
         }
         steerLeft(){
-            let currentMultiplier = STEERING_MULTIPLIER
-            let isGoingBackwards = this.isGoingBackwards()
-            if(this.isUsingBrake){
-              currentMultiplier*=0.5
-            }else if(this.absoluteVel()<MIN_STEERING_SPEED)return
-            if(isGoingBackwards)return this.direction+=currentMultiplier/2
-            this.direction-=currentMultiplier
+            this.steer(-1)
         }
         steerRight(){
-            let currentMultiplier = STEERING_MULTIPLIER
-            let isGoingBackwards = this.isGoingBackwards()
-            if(this.isUsingBrake){
-              currentMultiplier*=0.5
-            }else if(this.absoluteVel()<MIN_STEERING_SPEED)return
-            if(isGoingBackwards)return this.direction-=currentMultiplier/2
-            this.direction+=currentMultiplier
+            this.steer(1)
         }
         brake(dt){
           this.accX*=0.9**(1-dt)
