@@ -39,10 +39,10 @@
       let cars = [];
       // Araç özellikleri
       const CAR_WIDTH = 64;
-      const DRAG = 4.4; // increases drag when increased, was meant to decrease
+      const DRAG = 4; // increases drag when increased, was meant to decrease
       const TURN_DRAG = 0.8; // 0-1.0
-      const MOVE_MULTIPLIER = 700; // acceleration, should be increased when drag is increased
-      const STEERING_MULTIPLIER = 0.75
+      const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
+      const STEERING_MULTIPLIER = 0.8
       const MIN_ALIGNMENT = 0.7
       let toRadian = (x) => (x / 180) * Math.PI;
       let getMagnitude = Math.hypot
@@ -201,11 +201,6 @@
           return [AB,BC,CD,DA]
         }
         setGraphics(){
-          if(this.createGraphics){
-            this.graphics.x=this.posX
-            this.graphics.y=this.posY
-            this.graphics.angle=this.sprite.angle
-          }
           if(this.shouldDraw){
             this.drawGraphics(true)
           }
@@ -312,21 +307,26 @@
             this.accX = 0;
             this.accY = 0;
           }
+          if(this.createGraphics){
+            this.graphics.x=this.posX
+            this.graphics.y=this.posY
+            this.graphics.angle=this.sprite.angle
+          }
           this.isUsingBrake=false
         }
         // İleri hareket fonksiyonu
-        moveForward(scale=1) { // 0-1.0, will necessary to control acceleration
+        accelerate(dt=1,scale=1){
           let degree = this._direction;
           let radian = (Math.PI * degree) / 180;
-          this.accX += Math.cos(radian) * MOVE_MULTIPLIER*scale;
-          this.accY += Math.sin(radian) * MOVE_MULTIPLIER*scale;
+          this.accX += (Math.cos(radian) * MOVE_MULTIPLIER*scale)*dt;
+          this.accY += (Math.sin(radian) * MOVE_MULTIPLIER*scale)*dt;
+        }
+        moveForward(dt=1,scale=1) { // 0-1.0, will necessary to control acceleration
+          this.accelerate(dt*1000,scale)
         }
         // Geri hareket fonksiyonu
-        moveBackward(scale=1){
-          let degree = this._direction;
-          let radian = (Math.PI * degree) / 180;
-          this.accX += (-Math.cos(radian) * MOVE_MULTIPLIER) / 2*scale;
-          this.accY += (-Math.sin(radian) * MOVE_MULTIPLIER) / 2*scale;
+        moveBackward(dt=1,scale=1){
+          this.accelerate(dt*1000,-scale/2)
         }
         getAlignment(){
           return dotProduct(toUnitVector([this.velX,this.velY]),toVector(this._direction))
@@ -334,11 +334,12 @@
         isGoingBackwards(alignment=getAlignment()){
             return alignment<0
         }
-        steer(angle) {
+        steer(dt,angle) {
           let currentMultiplier = STEERING_MULTIPLIER;
           let alignment = this.getAlignment()
           let isGoingBackwards = this.isGoingBackwards(alignment);
-          if(Math.abs(alignment)<MIN_ALIGNMENT)return
+          if(Math.abs(alignment)<MIN_ALIGNMENT/this.absoluteVel()*80/(isGoingBackwards?2:1))return
+          currentMultiplier*=dt*100
           if (this.isUsingBrake) {
               currentMultiplier *= 0.5;
           } 
@@ -347,11 +348,11 @@
           } 
           this.direction += angle * currentMultiplier;
         }
-        steerLeft(){
-            this.steer(-1)
+        steerLeft(dt){
+            this.steer(dt,-1)
         }
-        steerRight(){
-            this.steer(1)
+        steerRight(dt){
+            this.steer(dt,1)
         }
         brake(dt){
           this.accX*=0.9**(1-dt)
@@ -384,6 +385,7 @@
       randCar.sprite=randSprite
       randCar.setPosition(200,50)
       const ticker = PIXI.Ticker.system;
+      window.ticker=ticker
       //testing section, will be deleted
       let frameTimes = [];
       let isDown = {};
@@ -403,32 +405,44 @@
       });
       let frameText = "0";
       let counter = 0;
-      ticker.add((dt) => {
-        if(counter++%1==0){
-          let deltaTime = dt.deltaMS/1000
+      let lastUpdate = Date.now()
+      const FIXED_LOOP_MS = 7
+      const FIXED_LOOP_S = FIXED_LOOP_MS/1000
+      let accumulatedTime = 0
+      let updateLoop = ()=>{
+        let now = Date.now()
+        let diff = now-lastUpdate
+        let deltaTime = diff/1000
+        accumulatedTime += diff
+        while(accumulatedTime>=FIXED_LOOP_MS){
           if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"]||isDown[" "]) {
               if (isDown[" "]) {
-                mainCar.brake(deltaTime)
+                mainCar.brake(FIXED_LOOP_S)
               }
               if (isDown["W"]) {
-                mainCar.moveForward();
+                mainCar.moveForward(FIXED_LOOP_S);
               }
               if (isDown["S"]) {
-                mainCar.moveBackward();
+                mainCar.moveBackward(FIXED_LOOP_S);
               }
               if (isDown["A"]) {
-                mainCar.steerLeft()
+                mainCar.steerLeft(FIXED_LOOP_S)
               }
               if (isDown["D"]) {
-                mainCar.steerRight()
+                mainCar.steerRight(FIXED_LOOP_S)
               }
             }
-          cars.forEach((car) => {
-            car.tick(deltaTime);
-          });
-          entities.forEach(e=>e.setGraphics())
-          frameTimes.push(Date.now());
+            cars.forEach((car) => {
+              car.tick(FIXED_LOOP_S);
+            });
+          accumulatedTime-=FIXED_LOOP_MS
         }
+          lastUpdate=now
+      }
+      setInterval(updateLoop,FIXED_LOOP_MS)
+      ticker.add((dt) => {
+        entities.forEach(e=>e.setGraphics())
+        frameTimes.push(Date.now());
       });
 
 
