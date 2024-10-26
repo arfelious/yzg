@@ -11,7 +11,6 @@
       /*
         TODO:
             araç çok yavaşken dönme düzenlenecek, ya belli hıza göre engellenecek, ya ivmesi olması istenecek ya da dönme hızı araç hızıne veya ivmesine göre olacak
-            collision detection araçların üst kısmında tam temas olmadan çalışıyor olabilir, incelenip düzeltilmeli
             araçların ayrı sprite'ları olmalı, sprite atamak yerine kullanılacak resmi belirtmeliyiz
             hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
               isUsingBrake kullanılırken TURN_DRAG değiştirilmeli
@@ -39,7 +38,6 @@
       document.body.appendChild(app.canvas);
       let entities = []
       let cars = [];
-
       // Araç özellikleri
       const CAR_WIDTH = 64;
       const DRAG = 4.4; // increases drag when increased, was meant to decrease
@@ -121,11 +119,11 @@
         anchorX=0.3
         anchorY=0.5
         graphics;
-        collisionGraphics;
         boundingRect
         lastColliders;
         _fillColor=0xff9900
         shouldDraw=false
+        drawCollision=true
         // Toggles debug graphics that outlines the sprite, it should change color when the entity collides
         createGraphics=true
         collisionBounds
@@ -134,10 +132,15 @@
           if(clearRect)this.graphics.clear()
           this.graphics.rect(...this.boundingRect)
           this.graphics.fill(this.fillColor)
-          if(this.collisionGraphics&&this.collisionBounds){
-            //this.collisionGraphics.clear()
-            //this.collisionGraphics.rect(...this.collisionBounds)
-            //this.collisionGraphics.fill(0x00ff00)
+          if(this.drawCollision){
+            let lines = this.getLines()
+            this.lines.forEach((e,i)=>{
+              let line = lines[i]
+              e.clear()
+              e.lineStyle(1, 0x099ff)
+                .moveTo(line[0][0],line[0][1])
+                .lineTo(line[1][0],line[1][1]).stroke();
+            })
           }
         }
         init(sprite){
@@ -150,7 +153,9 @@
           this._sprite = sprite;
           this.scaledBounds=[this.bounds[0][0],this.bounds[0][1],this.bounds[3][0]-this.bounds[0][0],this.bounds[3][1]-this.bounds[0][1]].map(e=>e*this.scale)
           if(this.createGraphics){
-            this.graphics = new PIXI.Graphics();      
+            this.graphics = new PIXI.Graphics();   
+            this.lines=Array(4).fill().map(()=>new PIXI.Graphics())
+            this.lines.forEach(e=>app.stage.addChild(e))   
             this.collisionGraphics= new PIXI.Graphics()
             app.stage.addChild(this.graphics);
             app.stage.addChild(this.collisionGraphics);
@@ -159,35 +164,27 @@
             this.drawGraphics()
           }
         }
+        a=0
         getLines(){
           /*
             A----B
             |    |
             D----C
           */
-         let width = this.scaledBounds[2]
-         let height = this.scaledBounds[3]
-         let offset = getMagnitude(this.scaledBounds[0],this.scaledBounds[1])
+          let width = this.scaledBounds[2]
+          let height = this.scaledBounds[3]
           let offsetAngleRad = Math.atan2(this.scaledBounds[0],this.scaledBounds[1])
           let startAngleRad = toRadian(this._direction)
           let xMultiplier = Math.cos(startAngleRad)
           let yMultiplier = Math.sin(startAngleRad)
-          let xOffset = this.scaledBounds[0]??offset*Math.cos(offsetAngleRad+0*startAngleRad)
-          let yOffset = this.scaledBounds[1]??offset*Math.sin(offsetAngleRad+startAngleRad)
-          //Bu fonksiyon kesinlikle elden geçirilmeli. modRadian ile startAngleRad arasında fark yok, kodu bunlardan yalnızca birini kullanacak şekilde güncellemek de işe yarar
-          let anchorMagnitude = 0
-          let directionHalfRadian = toRadian(this._direction)
-          let modDegree = (this.direction%360+360)%360
-          let modRadian = toRadian(modDegree)
-          let halfWidth = width/2
-          let halfHeight = height/2
-          let cosMod = Math.cos(modRadian)
-          let sinMod = Math.sin(modRadian)
-          let cosModM180 = Math.cos(toRadian(180-this.direction))
+          let anchorX = CAR_WIDTH*this.anchorX-this.scaledBounds[0]
+          let anchorY = CAR_WIDTH*this.anchorY*this.ratio-this.scaledBounds[1]
+          let anchorOffsetX=anchorX*xMultiplier-anchorY*yMultiplier
+          let anchorOffsetY = anchorX*yMultiplier+anchorY*xMultiplier
+          let xOffset = this.posX-anchorOffsetX
+          let yOffset = this.posY-anchorOffsetY
           //¯\_(ツ)_/¯
-          let anchorOffsetX = (modDegree<90?-width/2*cosModM180:0)+width/2*cosModM180-(modDegree>=180?halfWidth*sinMod:0)+(modDegree>=270?halfWidth*cosMod:0)
-          let anchorOffsetY = (modDegree<=90?cosMod*height:0)+(modDegree>180?-sinMod*height:0)+(modDegree>270?cosMod*height:0)
-          let A = [xOffset+anchorOffsetX,yOffset+anchorOffsetY]
+          let A = [xOffset,yOffset]
           let B = [A[0]+width*xMultiplier,A[1]+width*yMultiplier]
           let C = [B[0]+height*Math.cos(toRadian(90)+startAngleRad),B[1]+height*Math.sin(toRadian(90)+startAngleRad)]
           let D = [C[0]+width*Math.cos(toRadian(180)+startAngleRad),C[1]+width*Math.sin(toRadian(180)+startAngleRad)]
@@ -196,20 +193,13 @@
           let CD = [C,D]
           let DA = [D,A]
           this.shouldDraw=true
-          this.collisionBounds=[Math.min(A[0],B[0],C[0],D[0]),Math.min(A[1],B[1],C[1],D[1]),Math.max(...[A,B,C,D].map((e,i,a)=>a.map(w=>Math.abs(e[0]-w[0]))).flat()),
-          Math.max(...[A,B,C,D].map((e,i,a)=>a.map(w=>Math.abs(e[1]-w[1]))).flat())]
-          .map((e,i)=>e-(i==0?this.sprite.width*this.anchorX:i==1?this.sprite.height*this.anchorY:0))
-          return [AB,BC,CD,DA].map(e=>e.map(e=>[e[0]+this.posX-this.sprite.width*this.anchorX,e[1]+this.posY-this.sprite.height*this.anchorY]))
+          return [AB,BC,CD,DA]
         }
         setGraphics(){
           if(this.createGraphics){
             this.graphics.x=this.posX
             this.graphics.y=this.posY
             this.graphics.angle=this.sprite.angle
-            if(this.collisionGraphics&&this.collisionBounds){
-              this.collisionGraphics.x=this.posX
-              this.collisionGraphics.y=this.posY
-            }
           }
           if(this.shouldDraw){
             this.drawGraphics(true)
@@ -271,7 +261,6 @@
             let entityLines = e.getLines()
             return currLines.find(l1=>{
               let retVal = entityLines.find(l2=>checkIntersects(...l1,...l2))
-              if(retVal&&Math.random()>0.99&&counter<1000)console.log(JSON.stringify(l1),JSON.stringify(retVal))
               return retVal
             })
           })
@@ -381,7 +370,7 @@
       }
       let mainCar = new MainCar();
       window.mainCar=mainCar
-      mainCar.setPosition(50,50)
+      mainCar.setPosition(80,50)
       let randCar = new Car()
       randCar.sprite=randSprite
       randCar.setPosition(200,50)
