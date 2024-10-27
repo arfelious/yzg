@@ -50,12 +50,12 @@
     let cars = [];
     // Araç özellikleri
     const CAR_WIDTH = 64;
-    const ROAD_WIDTH = 150
+    const ROAD_WIDTH = 200
     const BARRIER_WIDTH = CAR_WIDTH/2
-    const DRAG = 4; // increases drag when increased, was meant to decrease
-    const TURN_DRAG = 0.8; // 0-1.0
+    const DRAG = 4.4; // increases drag when increased, was meant to decrease
+    const TURN_DRAG = 1; // 0-1.0
     const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
-    const STEERING_MULTIPLIER = 0.8
+    const STEERING_MULTIPLIER = 1
     const MIN_ALIGNMENT = 0.7
     let toRadian = (x) => (x / 180) * Math.PI;
     let getMagnitude = Math.hypot
@@ -138,6 +138,7 @@
       anchorX = 0
       anchorY = 0
       createGraphics = false
+      drawBounds=false
       collisionBounds
       isMovable = true
       entityType = "generic"
@@ -145,12 +146,15 @@
       drawGraphics(clearRect) {
         if (!this.createGraphics) return
         if (clearRect) this.graphics.clear()
-        this.graphics.rect(...this.boundingRect)
-        this.graphics.fill(this.fillColor)
+        if(this.drawBounds){
+          this.graphics.rect(...this.boundingRect)
+          this.graphics.fill(this.fillColor)
+        }
         if (this.drawCollision) {
           let lines = this.getLines()
           this.lines.forEach((e, i) => {
             let line = lines[i]
+            if(!line)return
             e.clear()
             e.moveTo(line[0][0], line[0][1])
               .lineTo(line[1][0], line[1][1]).stroke();
@@ -180,9 +184,11 @@
         this.scaledBounds = [this.bounds[0][0], this.bounds[0][1], this.bounds[3][0] - this.bounds[0][0], this.bounds[3][1] - this.bounds[0][1]].map(e => e * this.scale)
         if (this.createGraphics) {
           this.graphics = new PIXI.Graphics();
+          this.graphics.zIndex=1
           this.lines = Array(4).fill().map(() => new PIXI.Graphics())
           this.lines.forEach(e => {
             e.setStrokeStyle(0x099ff)
+            e.zIndex=1
             app.stage.addChild(e)
           })
           this.collisionGraphics = new PIXI.Graphics()
@@ -265,6 +271,7 @@
         if (!this.inScene) {
           this.inScene = true;
         }
+        this.spriteName=currSpritePath
         let sprite = PIXI.Sprite.from(imagePaths[currSpritePath])
         this.init(sprite)
         app.stage.addChild(sprite);
@@ -293,8 +300,8 @@
         if (absVel == 0) {
           nextAngle = this.lastDirection;
         } else nextAngle = toDegree(Math.atan2(this.velY, this.velX));
-        this.sprite.x = this.posX;
-        this.sprite.y = this.posY;
+        if(this.sprite.x!=this.posX)this.sprite.x = this.posX;
+        if(this.sprite.y!=this.posY)this.sprite.y = this.posY;
         this.sprite.angle = nextAngle;
         if (this._direction != this.sprite.angle) {
           nextAngle = this._direction;
@@ -392,7 +399,8 @@
       constructor(spritePath, createGraphics = false) {
         super()
         this.width = CAR_WIDTH
-        this.createGraphics = createGraphics
+        this.createGraphics=createGraphics
+        this.drawBounds=createGraphics
         this.sprite = spritePath
         this.entityType = "car"
         cars.push(this);
@@ -403,27 +411,42 @@
     class MainCar extends Car {
       constructor(spritePath) {
         super(spritePath, true);
-        this.graphics.zIndex=1
       }
     }
     class Road extends Entity {
       getLines(){
+        if(this.spriteName=="duzyol"){
+          let res = super.getLines()
+          let BC = res[1]
+          let DA = res[3]
+          const GREEN = 60
+          const ROAD = 50
+          const RATIO = GREEN/(GREEN+ROAD)/2
+          let nextBC = BC.map((e,i)=>e.map((e,q)=>e*RATIO+DA[+!i][+q]*(1-RATIO)))
+          let nextDA = DA.map((e,i)=>e.map((e,q)=>e*RATIO+BC[+!i][+q]*(1-RATIO)))
+          return [nextBC,nextDA]
+        }
         //TODO
         return []
       }
       constructor(spritePath, directionOffset, direction) {
         super()
+        this.entityType="road"
         this.zIndex = 0
+        this.createGraphics=true
+        this.drawCollision=true
         this.forceSquare = false
         this.width = ROAD_WIDTH
         this.directionOffset = directionOffset
         this.direction = direction
         this.sprite = spritePath
+        this.graphics.CacheAsBitmap=true
       }
     }
     class Barrier extends Entity{
       constructor(directionOffset=90,direction=0){
         super()
+        this.entityType="barrier"
         this.width=BARRIER_WIDTH
         this.directionOffset = directionOffset
         this.direction = direction
@@ -433,9 +456,9 @@
     app.stage.sortableChildren = true
     let mainCar = new MainCar("temp_car");
     window.mainCar = mainCar
-    mainCar.setPosition(80, 50)
+    mainCar.setPosition(80, 75)
     let randCar = new Car("temp_car")
-    randCar.setPosition(200, 50)
+    randCar.setPosition(200, 120)
     for (let i = 0; i < 5; i++) {
       for (let j = 0; j < 8; j++) {
         let tempRoad = new Road("duzyol", 0, 90)
