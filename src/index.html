@@ -12,6 +12,7 @@
   <script type="module">
     /*
       TODO:
+          sprite'lar küçük haliyle kullanılsa da büyük hali kadar yer kaplıyor, resimler dinamik olarak gerekeceği maksimum boyuta düşürülmeli
           road class'ı için getLines fonksiyonu yazılacak (sprite'ın dışına değil, yolun dışına çıktığında tetiklenecek. düz yol için 2 tane line yeterli olacak)
             road nesnelerinin içinde şeridi temsil eden bir nesne olmalı. modelin şeridi geçmesinin ve yoldan çıkmasının ayrı değerlendirilebilmesi için gerekli
           hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
@@ -29,25 +30,6 @@
     // Oyun ekranı boyutları
     const WIDTH = 800;
     const HEIGHT = 600;
-    const app = new PIXI.Application();
-    const { BitmapText } = PIXI;
-    await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true });
-    // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
-    let imagesArray = ["temp_car.png", "duzyol.png","bariyerr.png"]
-    let imagePaths = {}
-    //Tüm resimler asenkron yükleniyor, hepsi yüklenene kadar bekleniliyor
-    await Promise.all(imagesArray.map(imgPath => {
-      let currPath = "../assets/" + imgPath
-      imagePaths[imgPath.split(".").slice(0, -1).join(".")] = currPath
-      return PIXI.Assets.load(currPath)
-    }))
-    let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-    let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
-    let randSprite = PIXI.Sprite.from("../assets/temp_car.png");
-    document.body.appendChild(app.canvas);
-    let entities = []
-    window.entities = entities
-    let cars = [];
     // Araç özellikleri
     const CAR_WIDTH = 64;
     const ROAD_WIDTH = 200
@@ -57,6 +39,59 @@
     const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
     const STEERING_MULTIPLIER = 1
     const MIN_ALIGNMENT = 0.7
+    const app = new PIXI.Application();
+    const { BitmapText } = PIXI;
+    await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true });
+    let staticContainer = new PIXI.Container();
+    app.stage.addChild(staticContainer)
+    let changeImageResolution=async (texture, options)=>{
+      if(!options)return texture
+      let [intendedWidth,isRotated] = options
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if(isRotated){
+        canvas.width = Math.ceil(texture.width/texture.height * intendedWidth);
+        canvas.height = intendedWidth;
+      }else{
+        canvas.width = intendedWidth;
+        canvas.height = Math.ceil(texture.width/texture.height * intendedWidth);
+      }
+      texture.baseTexture.source.onload = () => {alert("yüklendi")}
+      texture.baseTexture.source.onerror = () => {alert("hata")}
+
+      let image = await app.renderer.extract.image(texture)
+      return new Promise(res=>{
+        image.onload=()=>{
+          context.drawImage(image, 0, 0, canvas.width, canvas.height)
+          let retVal = PIXI.Texture.from(canvas)
+          res(retVal)
+        }
+      })
+      
+      return retVal
+    }
+    // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
+    let imagesArray = ["temp_car.png", "duzyol.png","bariyerr.png"]
+    //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
+    let intendedWidths = {"duzyol.png":[ROAD_WIDTH,false],"temp_car.png":[CAR_WIDTH,true]}
+    let imagePaths = {}
+    window.imagePaths=imagePaths
+    //Tüm resimler asenkron yükleniyor, hepsi yüklenene kadar bekleniliyor
+    await Promise.all(imagesArray.map(imgPath =>new Promise(async res=>{
+      let currPath = "../assets/" + imgPath
+      let loaded = await PIXI.Assets.load(currPath)
+      loaded.source.scaleMode = 'nearest';
+      imagePaths[imgPath.split(".").slice(0, -1).join(".")] = await changeImageResolution(loaded,intendedWidths[imgPath])
+      res()
+      })
+    ))
+    let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+    let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
+    let randSprite = PIXI.Sprite.from("../assets/temp_car.png");
+    document.body.appendChild(app.canvas);
+    let entities = []
+    window.entities = entities
+    let cars = [];
     let toRadian = (x) => (x / 180) * Math.PI;
     let getMagnitude = Math.hypot
     let toVector = x => [Math.cos(toRadian(x)), Math.sin(toRadian(x))]
@@ -120,7 +155,7 @@
       return false
     }
     class Entity {
-      zIndex = 1
+      zIndex = 2
       accX = 0;
       accY = 0;
       velX = 0;
@@ -167,7 +202,7 @@
           if (e == this) return false
           let entityLines = e.getLines()
           return currLines.find(l1 => {
-            let retVal = entityLines.find(l2 => checkIntersects(...l1, ...l2))
+            let retVal = entityLines.find(l2 => checkIntersects(l1[0],l1[1],l2[0],l2[1]))
             return retVal
           })
         })
@@ -272,9 +307,11 @@
           this.inScene = true;
         }
         this.spriteName=currSpritePath
-        let sprite = PIXI.Sprite.from(imagePaths[currSpritePath])
+        let found = imagePaths[currSpritePath]
+        let sprite = PIXI.Sprite.from(found)
         this.init(sprite)
-        app.stage.addChild(sprite);
+        if(this.entityType=="road")staticContainer.addChild(sprite)
+        else app.stage.addChild(sprite);
         sprite.zIndex = this.zIndex
       }
       // Hız büyüklüğünü hesaplayan fonksiyon
@@ -440,7 +477,7 @@
         this.directionOffset = directionOffset
         this.direction = direction
         this.sprite = spritePath
-        this.graphics.CacheAsBitmap=true
+        //this.sprite.CacheAsBitmap=true
       }
     }
     class Barrier extends Entity{
@@ -470,6 +507,7 @@
     const ticker = PIXI.Ticker.system;
     window.ticker = ticker
     window.stage = app.stage
+    window.app=app
     //testing section, will be deleted
     let frameTimes = [];
     let isDown = {};
@@ -490,7 +528,7 @@
     let frameText = "0";
     let counter = 0;
     let lastUpdate = Date.now()
-    const FIXED_LOOP_MS = 7
+    const FIXED_LOOP_MS = 10
     const FIXED_LOOP_S = FIXED_LOOP_MS / 1000
     let accumulatedTime = 0
     let updateLoop = () => {
