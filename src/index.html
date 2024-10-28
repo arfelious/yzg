@@ -12,8 +12,8 @@
   <script type="module">
     /*
       TODO:
-          sprite'lar küçük haliyle kullanılsa da büyük hali kadar yer kaplıyor, resimler dinamik olarak gerekeceği maksimum boyuta düşürülmeli
-          road class'ı için getLines fonksiyonu yazılacak (sprite'ın dışına değil, yolun dışına çıktığında tetiklenecek. düz yol için 2 tane line yeterli olacak)
+          sprite'lar küçük haliyle kullanılsa da büyük hali kadar yer kaplıyor, yeni resim ekleyeceğimiz zaman intendedWidths kısmına gerekecek max genişliği yazmalıyız
+          road class'ının diğer türleri için getLines fonksiyonu yazılacak (sprite'ın dışına değil, yolun dışına çıktığında tetiklenecek)
             road nesnelerinin içinde şeridi temsil eden bir nesne olmalı. modelin şeridi geçmesinin ve yoldan çıkmasının ayrı değerlendirilebilmesi için gerekli
           hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
             isUsingBrake kullanılırken TURN_DRAG değiştirilmeli
@@ -56,9 +56,6 @@
         canvas.width = intendedWidth;
         canvas.height = Math.ceil(texture.width/texture.height * intendedWidth);
       }
-      texture.baseTexture.source.onload = () => {alert("yüklendi")}
-      texture.baseTexture.source.onerror = () => {alert("hata")}
-
       let image = await app.renderer.extract.image(texture)
       return new Promise(res=>{
         image.onload=()=>{
@@ -528,7 +525,7 @@
     let frameText = "0";
     let counter = 0;
     let lastUpdate = Date.now()
-    const FIXED_LOOP_MS = 10
+    const FIXED_LOOP_MS = 7
     const FIXED_LOOP_S = FIXED_LOOP_MS / 1000
     let accumulatedTime = 0
     let updateLoop = () => {
