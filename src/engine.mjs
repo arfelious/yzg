@@ -16,11 +16,11 @@
         visualize buttons as they are being pressed, might be necessary when RL model is used
       */
     // Oyun ekranı boyutları
-    const WIDTH = 1000;
-    const HEIGHT = 800;
+    const WIDTH = 1200;
+    const HEIGHT = 900;
     // Araç özellikleri
     const CAR_WIDTH = 64;
-    const ROAD_WIDTH = 200
+    const ROAD_WIDTH = 150
     const BARRIER_WIDTH = CAR_WIDTH/2
     const DRAG = 4.4; // increases drag when increased, was meant to decrease
     const TURN_DRAG = 1; // 0-1.0
@@ -98,7 +98,11 @@
         curr=[0,initialY]
         fromDirection="left"
       }
-      if(grid[curr[0]][curr[1]][0]!=-1)return false
+      if(grid[curr[0]][curr[1]][0]!=-1){
+        let roadType = ROAD_TYPES_ARR[grid[curr[0]][curr[1]][0]]
+        let currentDirections = getConnections(roadType,grid[curr[0]][curr[1]][1])
+        return currentDirections.includes(fromDirection)?grid:false
+      }
       let [lastX,lastY]=curr
       let nextPossibleRoads=[[lastX,lastY-1],[lastX+1,lastY],[lastX,lastY+1],[lastX-1,lastY]]
       let currWeights = getWeights(grid)
@@ -587,7 +591,7 @@
         tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
       }
     }
-    let roadOffsetY = ROAD_WIDTH*2
+    let roadOffsetY = Math.ceil(GRID_HEIGHT/2)*ROAD_WIDTH
     let mainCar = new MainCar("temp_car");
     window.mainCar = mainCar
     mainCar.setPosition(80, 75+roadOffsetY)
