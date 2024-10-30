@@ -1,6 +1,8 @@
     /*
       TODO:
-          sprite'lar küçük haliyle kullanılsa da büyük hali kadar yer kaplıyor, yeni resim ekleyeceğimiz zaman intendedWidths kısmına gerekecek max genişliği yazmalıyız
+          yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
+            bir yoldan diğer yola erişilebilip erişilemediğini kontrol etmek için fonksiyon
+          yol olmayan yerlere geçici yeşil kare sprite, resimler ayarlanınca bina park vs. ile değiştirilecek
           road class'ının diğer türleri için getLines fonksiyonu yazılacak (sprite'ın dışına değil, yolun dışına çıktığında tetiklenecek)
             road nesnelerinin içinde şeridi temsil eden bir nesne olmalı. modelin şeridi geçmesinin ve yoldan çıkmasının ayrı değerlendirilebilmesi için gerekli
           hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
@@ -8,7 +10,7 @@
           collidersEquals fonksiyonu yazılmalı 
             prev array'indeki her elemanın next'te de bulunmasına bakması yeterli olur ama optimize edilebilir
           araçların iç ve dış hız değerleri farklı olmalı. araçların yönü hızına göre belirlendiği için bir araç çarparsa araç aniden yön değiştirir, önlemek içi ayrı hız değerleri kullanılıp hesaplamalarda ikisini beraber kullanacak bi hız değeri kullanılır. direction ve _direction'da olduğu gibi getter setter kullanılmalı
-          yol sprite'ları, trafik işaretleri, farklı araçlar eklenmeli
+          trafik işaretleri, engeller ve farklı araçlar eklenmeli
           aracın yavaşlayışı aracın baktığı açıya ve hıza göre olmalı (kaymaya yakın görünümdeykenki yavaşlama miktarı, düz giderkenkinden fazla olmalı)
           collision detection
             collision resolution
@@ -555,11 +557,11 @@
     }
     class Road extends Entity {
       getLines(){
-        if(this.spriteName=="duzyol"){
+        if(this.spriteName=="duzyol.png"){
           let res = super.getLines()
           let BC = res[1]
           let DA = res[3]
-          const GREEN = 60
+          const GREEN = 30
           const ROAD = 50
           const RATIO = GREEN/(GREEN+ROAD)/2
           let nextBC = BC.map((e,i)=>e.map((e,q)=>e*RATIO+DA[+!i][+q]*(1-RATIO)))
@@ -596,7 +598,6 @@
     }
     app.stage.sortableChildren = true
     let currMap = createMap()
-    console.log(currMap)
     let possibleStarts = []
     for (let i = 0; i < GRID_WIDTH; i++) {
       for (let j = 0; j < GRID_HEIGHT; j++) {
@@ -609,7 +610,6 @@
     }
     let currentStart = possibleStarts[Math.floor(Math.random()*possibleStarts.length)]
     let roadOffsetY = currentStart*ROAD_WIDTH
-    console.log("offs",roadOffsetY,possibleStarts)
     let mainCar = new MainCar("temp_car");
     window.mainCar = mainCar
     mainCar.setPosition(80, 50+roadOffsetY)
@@ -684,30 +684,6 @@
 
 
     // FPS Sayacı
-    function resize() {
-      return
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-  
-      // Calculate the scale factor
-      const scale = Math.min(windowWidth / app.screen.width, windowHeight / app.screen.height);
-  
-      // Scale the stage
-      //app.stage.scale.set(scale);
-  
-      // Center the app in the window
-      app.view.style.position = 'absolute';
-      app.canvas.style.position = 'absolute';
-      app.canvas.style.height="100vh"
-      app.canvas.style.width=""
-      app.canvas.style.left=(windowWidth-windowHeight)/2+"px"
-  }
-  
-  // Initial call to resize
-  resize();
-  
-  // Add resize event listener
-  window.addEventListener('resize', resize);
     let fpsFontSize = 20
     const bitmapFontText = new BitmapText({
       text: frameText,
