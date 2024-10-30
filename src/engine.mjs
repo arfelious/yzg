@@ -1,5 +1,7 @@
     /*
       TODO:
+          mobilde test için oyun kısmının dışına 4 adet buton, WASD ile yapıldığı gibi hareket edilmesini sağlayacak
+          engine kısmı mainCar'ın yerleştirilmesi ve harita oluşturulması gibi kısımları içermemeli, ayrı bir game.mjs dosyası oluşturulabilir
           yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
             bir yoldan diğer yola erişilebilip erişilemediğini kontrol etmek için fonksiyon
           yol olmayan yerlere geçici yeşil kare sprite, resimler ayarlanınca bina park vs. ile değiştirilecek
@@ -77,10 +79,13 @@
       return shiftConnections(ROAD_TYPES[roadType].map(e=>angleLookup[e]),angle)
     }
     let getOpposite=(direction)=>{
-      if (direction == "up") return "down";
-      if (direction == "down") return "up";
-      if (direction == "left") return "right";
-      if (direction == "right") return "left";
+      return connectionArray[(connectionLookup[direction]+2)%4]
+    }
+    let getRelativeDirection = (p1,p2)=>{
+      //p1 p2'ye gidiyorsa hangi yönden geldiği
+      let xDiff = p2[0]-p1[0]
+      let yDiff = p2[1]-p1[1]
+      return xDiff>0?"left":xDiff<0?"right":yDiff>0?"up":"down"
     }
     let getWeights = grid=>{
       let weightObj = {}
@@ -101,6 +106,7 @@
       return x
     }
     let randomAngles = ()=>shuffle([0,90,180,270])
+    let getNeighbours = point=>[[point[0],point[1]-1],[point[0]+1,point[1]],[point[0],point[1]+1],[point[0]-1,point[1]]]
     let createMap = (grid,curr,fromDirection)=>{
       let firstInsert = !grid
       if(firstInsert){
@@ -114,8 +120,7 @@
         let currentDirections = getConnections(roadType,grid[curr[0]][curr[1]][1])
         return currentDirections.includes(fromDirection)?grid:false
       }
-      let [lastX,lastY]=curr
-      let nextPossibleRoads=[[lastX,lastY-1],[lastX+1,lastY],[lastX,lastY+1],[lastX-1,lastY]]
+      let nextPossibleRoads=getNeighbours(curr)
       let currWeights = getWeights(grid)
       let currRoads = firstInsert?["straight"]:ROAD_TYPES_ARR.slice(0).sort((x,y)=>currWeights[x]-currWeights[y])
       for(let i = 0;i<currRoads.length;i++){
@@ -159,21 +164,55 @@
       }
       return false
     }
-    window.createMap=createMap
-    let weightedRand = arr=>{
-      const totalWeight = elements.reduce((acc,x) => sum + x[1], 0);
-      const random = Math.random() * totalWeight;
-      let cumulativeWeight = 0;
-      for (let [e, w] of elements) {
-          cumulativeWeight += w;
-          if (random < cumulativeWeight) {
-              return 
-          }
+    let copyVisitedObj = x=>{
+      let res = {}
+      for(let e in x){
+        res[e]={}
+        for(let i in x[e]){
+          res[e][i]=1
+        }
       }
-      return elements[elements.length - 1][0];
+      return res
+    }
+    let findPath = (grid,road1Indexes,road2Indexes,getMinimumDistance=false,visited=[],visitedObj={})=>{
+      visited.push(road1Indexes)
+      let [currX,currY]=road1Indexes
+      if(!visitedObj[currX])visitedObj[currX]={}
+      if(visitedObj[currX][currY])return false
+      else visitedObj[currX][currY]=1
+      if(currX<0||currX>=GRID_WIDTH||currY<0||currY>=GRID_HEIGHT)return false
+      if(currX==road2Indexes[0]&&currY==road2Indexes[1]){
+        return visited
+      }
+      let left = grid[road1Indexes[0]][road1Indexes[1]]
+      if(left[0]==-1)return false
+      let leftNeighbours=getNeighbours(road1Indexes)
+      let leftConnections = getConnections(ROAD_TYPES_ARR[left[0]],left[1]).map(e=>leftNeighbours[connectionLookup[e]])
+      let currMinimumLength=Infinity
+      let res=false
+      for(let i = 0;i<leftConnections.length;i++){
+        let curr = leftConnections[i]
+        let tempRes = findPath(grid,curr,road2Indexes,getMinimumDistance,visited.map(e=>e),copyVisitedObj(visitedObj))
+        if(tempRes){
+          if(!getMinimumDistance)return tempRes
+          let tempLength = tempRes.length
+          if(tempLength<currMinimumLength){
+            currMinimumLength=tempLength
+            res=tempRes
+          }
+        }
+      }
+      return res
+    }
+    let findPathTo = (x,y,getMinimumDistance)=>{
+      let gridIndexes = getIndexes(x,y)
+      let [gridX,gridY] = gridIndexes
+      let gridElement = currMap[gridX][gridY]
+      if(gridElement[0]==-1)return false
+      let res = findPath(currMap,getIndexes(mainCar.posX,mainCar.posY),gridIndexes,getMinimumDistance)
+      return res
     }
     let imagePaths = {}
-    window.imagePaths=imagePaths
     //Tüm resimler asenkron yükleniyor, hepsi yüklenene kadar bekleniliyor
     await Promise.all(imagesArray.map(imgPath =>new Promise(async res=>{
       let currPath = "../assets/" + imgPath
@@ -195,6 +234,8 @@
     const GRID_HEIGHT = HEIGHT/ROAD_WIDTH
     let grid = []
     let entities = []
+    window.GRID_WIDTH=GRID_WIDTH
+    window.GRID_HEIGHT=GRID_HEIGHT
     window.entities = entities
     let cars = [];
     let toRadian = (x) => (x / 180) * Math.PI;
@@ -221,6 +262,7 @@
       return (Q[0] < Math.max(P[0], R[0]) && Q[0] > Math.min(P[0], R[0]) &&
         Q[1] < Math.max(P[1], R[1]) && Q[1] > Math.min(P[1], R[1]));
     }
+    let getIndexes = (x,y)=>[Math.floor(x/ROAD_WIDTH),Math.floor(y/ROAD_WIDTH)]
     let checkIntersects = (A, B, C, D) => {
       const o1 = getOrientation(A, B, C);
       const o2 = getOrientation(A, B, D);
@@ -557,6 +599,7 @@
     }
     class Road extends Entity {
       getLines(){
+        return []
         if(this.spriteName=="duzyol.png"){
           let res = super.getLines()
           let BC = res[1]
@@ -571,6 +614,41 @@
         //TODO
         return []
       }
+      tick(dt){
+        super.tick(dt)
+
+        
+      }
+      highlightContainer;
+      highlightLines;
+      highlightToggles;
+      drawHighlight(index){
+        let currentAngle = connectionLookup[getConnections(this.roadType,this._direction)[index]]*90-90 //TODO: -90 neden işe yaradı
+        let targetX = this.posX+ROAD_WIDTH/2*Math.cos(toRadian(currentAngle))
+        let targetY = this.posY+ROAD_WIDTH/2*Math.sin(toRadian(currentAngle))
+        this.highlightLines[index].clear()
+        this.highlightLines[index].strokeWidth=20
+        this.highlightLines[index].moveTo(this.posX, this.posY).lineTo(targetX,targetY).stroke();
+      }
+      toggleHighlight(index,value=!this.highlightToggles[index]){
+        if(Array.isArray(index))index.forEach(e=>this.toggleHighlight(e,value))
+        if(!this.highlightContainer){
+          this.highlightContainer=new PIXI.Container();
+          app.stage.addChild(this.highlightContainer)
+        }
+        if(!this.highlightLines[index]){
+          this.highlightLines[index]=new PIXI.Graphics()
+        }
+        if(value){
+          let curr=this.highlightLines[index]
+          curr.setStrokeStyle({color:0x006699,width:4})
+          curr.zIndex=this.zIndex+1
+          this.highlightContainer.addChild(curr)
+          this.drawHighlight(index)
+        }
+        this.highlightToggles[index]=value
+        this.highlightLines[index].visible=value
+      }
       constructor(spritePath, directionOffset, direction) {
         super()
         this.anchorX=0.5
@@ -584,6 +662,13 @@
         this.directionOffset = directionOffset
         this.direction = direction
         this.sprite = spritePath
+        this.roadType=IMAGE_TO_TYPE[spritePath]
+        this.roadAmount=ROAD_TYPES[this.roadType].length
+        this.highlightToggles=Array(this.roadAmount).fill(false)
+        this.highlightLines=Array(this.roadAmount).fill()
+        for(let i = 0;i<this.roadAmount;i++)this.toggleHighlight(i,true)
+        for(let i = 0;i<this.roadAmount;i++)this.toggleHighlight(i,false)
+
       }
     }
     class Barrier extends Entity{
@@ -599,12 +684,16 @@
     app.stage.sortableChildren = true
     let currMap = createMap()
     let possibleStarts = []
+    let roads = []
+    window.roads=roads
     for (let i = 0; i < GRID_WIDTH; i++) {
+      roads[i]=[]
       for (let j = 0; j < GRID_HEIGHT; j++) {
         let curr = currMap[i][j]
         if(curr[0]==-1)continue
         if(i==0&&curr[0]==0&&(curr[1]==90||curr[1]==270))possibleStarts.push(j)
         let tempRoad = new Road(TYPE_TO_IMAGE[ROAD_TYPES_ARR[curr[0]]], 0, curr[1])
+        roads[i][j]=tempRoad
         tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
       }
     }
@@ -646,6 +735,31 @@
     const FIXED_LOOP_MS = 7
     const FIXED_LOOP_S = FIXED_LOOP_MS / 1000
     let accumulatedTime = 0
+    app.canvas.onpointerup=e=>{
+      let rect = e.target.getBoundingClientRect();
+      let scale = WIDTH/rect.width
+      let x = (e.clientX - rect.left)*scale;
+      let y = (e.clientY - rect.top)*scale;
+      roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_,i)=>e.toggleHighlight(i,false))))
+      let currPath = findPathTo(x,y,true)
+      if(currPath){
+        let lastRoadIndex = currPath[0]
+        let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]]
+        let lastConnections = getConnections(lastRoad.roadType,lastRoad._direction)
+        for(let i = 1;i<currPath.length;i++){
+          let currRoadIndex = currPath[i]
+          let currentRelation = getRelativeDirection(lastRoadIndex,currRoadIndex)
+          let highlightInPrevious = getOpposite(currentRelation)
+          let currRoad=roads[currRoadIndex[0]][currRoadIndex[1]]
+          let currentConnections = getConnections(currRoad.roadType,currRoad._direction)
+          lastRoad.toggleHighlight(lastConnections.indexOf(highlightInPrevious),true)
+          currRoad.toggleHighlight(currentConnections.indexOf(currentRelation),true)
+          lastRoadIndex=currRoadIndex
+          lastRoad=currRoad
+          lastConnections=currentConnections
+        }
+      }
+    }
     let updateLoop = () => {
       let now = Date.now()
       let diff = now - lastUpdate
