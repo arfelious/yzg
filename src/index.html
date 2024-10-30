@@ -3,6 +3,30 @@
 
 <head>
   <title>YZG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #game {
+        height: 100vh;
+        width: auto;
+        max-width: 100%;
+        background-color: lightgray; /* Optional: for visibility */
+    }
+    @media (max-width: 767px) { /* For mobile */
+        #game {
+            width: 100vw  !important;
+            height: auto !important;
+            position: absolute;
+            top:0;
+        }
+    }
+  </style>
 </head>
 
 <body>
