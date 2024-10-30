@@ -19,17 +19,17 @@
     const WIDTH = 1200;
     const HEIGHT = 900;
     // Araç özellikleri
-    const CAR_WIDTH = 64;
+    const CAR_WIDTH = 48;
     const ROAD_WIDTH = 150
     const BARRIER_WIDTH = CAR_WIDTH/2
     const DRAG = 4.4; // increases drag when increased, was meant to decrease
-    const TURN_DRAG = 1; // 0-1.0
-    const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
-    const STEERING_MULTIPLIER = 1
+    const TURN_DRAG = 1.5;
+    const MOVE_MULTIPLIER = 150; // acceleration, should be increased when drag is increased
+    const STEERING_MULTIPLIER = 1.5
     const MIN_ALIGNMENT = 0.7
     const app = new PIXI.Application();
     const { BitmapText } = PIXI;
-    await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true });
+    await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
     let staticContainer = new PIXI.Container();
     app.stage.addChild(staticContainer)
     let changeImageResolution=async (texture, options)=>{
@@ -89,12 +89,21 @@
       }))
       return weightObj
     }
+    let countInserted = grid=>grid.map(e=>e.filter(e=>e[0]!=-1).length).reduce((x,y)=>x+y)
     let inBounds = (point)=>point[0]>=0&&point[0]<GRID_WIDTH&&point[1]>=0&&point[1]<GRID_HEIGHT
+    let shuffle = x=>{
+      for(let i = 0;i<x.length;i++){
+        let randIndex = Math.floor(Math.random()*(x.length-i))+i;
+        [x[i],x[randIndex]]=[x[randIndex],x[i]]
+      }
+      return x
+    }
+    let randomAngles = ()=>shuffle([0,90,180,270])
     let createMap = (grid,curr,fromDirection)=>{
       let firstInsert = !grid
       if(firstInsert){
         grid=Array(GRID_WIDTH).fill().map(e=>Array(GRID_HEIGHT).fill([-1,-1]))
-        let initialY = Math.floor(GRID_HEIGHT/2)
+        let initialY = Math.floor(Math.random()*GRID_HEIGHT)
         curr=[0,initialY]
         fromDirection="left"
       }
@@ -109,7 +118,9 @@
       let currRoads = firstInsert?["straight"]:ROAD_TYPES_ARR.slice(0).sort((x,y)=>currWeights[x]-currWeights[y])
       for(let i = 0;i<currRoads.length;i++){
           let roadType = currRoads[i]
-          for(let angle=0;angle<360;angle+=90){
+          let angles = randomAngles()
+          for(let j=0;j<4;j++){
+            let angle = angles[j]
             let tempGrid=grid.map(e=>e.slice(0)) //referansın üzerine yazmamak için kopyalanıyor
             let possibleDirections = getConnections(roadType,angle)
             if(!possibleDirections.includes(fromDirection))continue
@@ -139,6 +150,7 @@
               }
             }
             if(!hasFailed){
+              if(firstInsert&&countInserted(tempGrid)/GRID_HEIGHT/GRID_HEIGHT<0.4)return createMap()
               return tempGrid
             }
           }
@@ -175,6 +187,8 @@
     let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
     let randSprite = PIXI.Sprite.from("../assets/temp_car.png");
     document.body.appendChild(app.canvas);
+    app.canvas.style=""
+    app.canvas.id="game"
     const GRID_WIDTH = WIDTH/ROAD_WIDTH
     const GRID_HEIGHT = HEIGHT/ROAD_WIDTH
     let grid = []
@@ -583,20 +597,24 @@
     app.stage.sortableChildren = true
     let currMap = createMap()
     console.log(currMap)
+    let possibleStarts = []
     for (let i = 0; i < GRID_WIDTH; i++) {
       for (let j = 0; j < GRID_HEIGHT; j++) {
         let curr = currMap[i][j]
         if(curr[0]==-1)continue
+        if(i==0&&curr[0]==0&&(curr[1]==90||curr[1]==270))possibleStarts.push(j)
         let tempRoad = new Road(TYPE_TO_IMAGE[ROAD_TYPES_ARR[curr[0]]], 0, curr[1])
         tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
       }
     }
-    let roadOffsetY = Math.ceil(GRID_HEIGHT/2)*ROAD_WIDTH
+    let currentStart = possibleStarts[Math.floor(Math.random()*possibleStarts.length)]
+    let roadOffsetY = currentStart*ROAD_WIDTH
+    console.log("offs",roadOffsetY,possibleStarts)
     let mainCar = new MainCar("temp_car");
     window.mainCar = mainCar
-    mainCar.setPosition(80, 75+roadOffsetY)
+    mainCar.setPosition(80, 50+roadOffsetY)
     let randCar = new Car("temp_car")
-    randCar.setPosition(200, 120+roadOffsetY)
+    randCar.setPosition(100, 100+roadOffsetY)
     //let testRoad = new Road(TYPE_TO_IMAGE["3"],0,0)
     //testRoad.setPosition(100,100)
     let tempBarrier = new Barrier(90,180)
@@ -666,6 +684,30 @@
 
 
     // FPS Sayacı
+    function resize() {
+      return
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+  
+      // Calculate the scale factor
+      const scale = Math.min(windowWidth / app.screen.width, windowHeight / app.screen.height);
+  
+      // Scale the stage
+      //app.stage.scale.set(scale);
+  
+      // Center the app in the window
+      app.view.style.position = 'absolute';
+      app.canvas.style.position = 'absolute';
+      app.canvas.style.height="100vh"
+      app.canvas.style.width=""
+      app.canvas.style.left=(windowWidth-windowHeight)/2+"px"
+  }
+  
+  // Initial call to resize
+  resize();
+  
+  // Add resize event listener
+  window.addEventListener('resize', resize);
     let fpsFontSize = 20
     const bitmapFontText = new BitmapText({
       text: frameText,
