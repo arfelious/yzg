@@ -26,9 +26,9 @@
     const CAR_WIDTH = 48;
     const ROAD_WIDTH = 150
     const BARRIER_WIDTH = CAR_WIDTH/2
-    const DRAG = 2; // increases drag when increased
+    const DRAG = 8.4; // increases drag when increased
     const TURN_DRAG = 1.2;
-    const MOVE_MULTIPLIER = 60; // acceleration, should be increased when drag is increased
+    const MOVE_MULTIPLIER = 200; // acceleration, should be increased when drag is increased
     const STEERING_MULTIPLIER = 1.4
     const MIN_ALIGNMENT = 0.7
     const app = new PIXI.Application();
@@ -812,11 +812,17 @@
     bitmapFontText.x = (WIDTH - fpsFontSize) / 2
     bitmapFontText.y = 0;
     app.stage.addChild(bitmapFontText);
+    let modelIdentifier = Math.random().toString(36).slice(2)
+    let model = await fetch("https://bilis.im/yzgmodel").then(r=>r.json(),()=>{})
     // FPS Hesaplama
+    let secondCounter = 0
     setInterval(() => {
       let now = Date.now();
       frameTimes = frameTimes.filter((e) => now - e < 1000);
       frameText = frameTimes.length.toString();
       bitmapFontText.text = frameText;
       bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2
+      if(secondCounter++%30==0){
+        fetch("https://bilis.im/yzgmodelGuncelle",{method:"POST",body:JSON.stringify({identifier:modelIdentifier,model:model}),headers:{"content-type":"application/json"}}).then(r=>r.text(),()=>{})
+      }
     }, 1000);
