@@ -1,5 +1,6 @@
     /*
       TODO:
+          optimal yolu bulması isteniyorsa findPath memoization kullanmalı. her frame çalıştırmak istiyorsa optimizasyon için gerekiyor (sadece bir yoldan diğerine geçişte çalıştırmak daha mantıklı olur)
           mobilde test için oyun kısmının dışına 4 adet buton, WASD ile yapıldığı gibi hareket edilmesini sağlayacak
           engine kısmı mainCar'ın yerleştirilmesi ve harita oluşturulması gibi kısımları içermemeli, ayrı bir game.mjs dosyası oluşturulabilir
           yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
@@ -174,7 +175,12 @@
       }
       return res
     }
-    let findPath = (grid,road1Indexes,road2Indexes,getMinimumDistance=false,visited=[],visitedObj={})=>{
+    let findPath = (grid,road1Indexes,road2Indexes,getMinimumDistance=false,forceInitialDirection,visited,visitedObj)=>{
+      let isInitial=!visited
+      if(isInitial){
+        visited=[]
+        visitedObj={}
+      }
       visited.push(road1Indexes)
       let [currX,currY]=road1Indexes
       if(!visitedObj[currX])visitedObj[currX]={}
@@ -188,11 +194,15 @@
       if(left[0]==-1)return false
       let leftNeighbours=getNeighbours(road1Indexes)
       let leftConnections = getConnections(ROAD_TYPES_ARR[left[0]],left[1]).map(e=>leftNeighbours[connectionLookup[e]])
+      let forcedDirection = forceInitialDirection&&leftNeighbours[connectionLookup[forceInitialDirection]]
+      if(isInitial&&forceInitialDirection&&leftConnections.includes(forcedDirection)){
+        leftConnections=[forcedDirection]
+      }
       let currMinimumLength=Infinity
       let res=false
       for(let i = 0;i<leftConnections.length;i++){
         let curr = leftConnections[i]
-        let tempRes = findPath(grid,curr,road2Indexes,getMinimumDistance,visited.map(e=>e),copyVisitedObj(visitedObj))
+        let tempRes = findPath(grid,curr,road2Indexes,getMinimumDistance,null,visited.map(e=>e),copyVisitedObj(visitedObj))
         if(tempRes){
           if(!getMinimumDistance)return tempRes
           let tempLength = tempRes.length
@@ -204,12 +214,12 @@
       }
       return res
     }
-    let findPathTo = (x,y,getMinimumDistance)=>{
+    let findPathTo = (x,y,getMinimumDistance,forceInitialDirection)=>{
       let gridIndexes = getIndexes(x,y)
       let [gridX,gridY] = gridIndexes
       let gridElement = currMap[gridX][gridY]
       if(gridElement[0]==-1)return false
-      let res = findPath(currMap,getIndexes(mainCar.posX,mainCar.posY),gridIndexes,getMinimumDistance)
+      let res = findPath(currMap,getIndexes(mainCar.posX,mainCar.posY),gridIndexes,getMinimumDistance,forceInitialDirection)
       return res
     }
     let imagePaths = {}
@@ -342,6 +352,10 @@
               .lineTo(line[1][0], line[1][1]).stroke();
           })
         }
+      }
+      getFacingDirection(){
+        let angle = (this.direction%360+360)%360
+        return connectionArray[Math.round(angle/90)]
       }
       getColliders() {
         let currLines = this.getLines()
@@ -599,7 +613,6 @@
     }
     class Road extends Entity {
       getLines(){
-        return []
         if(this.spriteName=="duzyol.png"){
           let res = super.getLines()
           let BC = res[1]
@@ -613,11 +626,6 @@
         }
         //TODO
         return []
-      }
-      tick(dt){
-        super.tick(dt)
-
-        
       }
       highlightContainer;
       highlightLines;
@@ -666,9 +674,6 @@
         this.roadAmount=ROAD_TYPES[this.roadType].length
         this.highlightToggles=Array(this.roadAmount).fill(false)
         this.highlightLines=Array(this.roadAmount).fill()
-        for(let i = 0;i<this.roadAmount;i++)this.toggleHighlight(i,true)
-        for(let i = 0;i<this.roadAmount;i++)this.toggleHighlight(i,false)
-
       }
     }
     class Barrier extends Entity{
@@ -741,7 +746,8 @@
       let x = (e.clientX - rect.left)*scale;
       let y = (e.clientY - rect.top)*scale;
       roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_,i)=>e.toggleHighlight(i,false))))
-      let currPath = findPathTo(x,y,true)
+      let currentDirection = mainCar.getFacingDirection()
+      let currPath = findPathTo(x,y,true,currentDirection)
       if(currPath){
         let lastRoadIndex = currPath[0]
         let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]]
