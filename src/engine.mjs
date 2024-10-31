@@ -68,7 +68,7 @@
     let intendedWidths = {"temp_car.png":[CAR_WIDTH,true]}
     ROAD_IMAGES.forEach(e=>intendedWidths[e]=[ROAD_WIDTH,false])
     // Helper function to get the connections based on road type and angle
-    const ROAD_TYPES = {"straight":[0,180],"rightcurve":[90,180],"3":[0,90,270],"4":[0,90,180,270]}
+    const ROAD_TYPES = {"straight":[0,180],"rightcurve":[0,90],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
     let connectionArray = ["up","right","down","left"]
     let connectionLookup = {"up":0,"right":1,"down":2,"left":3}
