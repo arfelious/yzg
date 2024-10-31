@@ -1,10 +1,10 @@
     /*
       TODO:
+          yol bulucunun çizdiği yolun sonuna görünürlüğü arttırmak amacıyla daire eklenecek
           optimal yolu bulması isteniyorsa findPath memoization kullanmalı. her frame çalıştırmak istiyorsa optimizasyon için gerekiyor (sadece bir yoldan diğerine geçişte çalıştırmak daha mantıklı olur)
           mobilde test için oyun kısmının dışına 4 adet buton, WASD ile yapıldığı gibi hareket edilmesini sağlayacak
           engine kısmı mainCar'ın yerleştirilmesi ve harita oluşturulması gibi kısımları içermemeli, ayrı bir game.mjs dosyası oluşturulabilir
           yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
-            bir yoldan diğer yola erişilebilip erişilemediğini kontrol etmek için fonksiyon
           yol olmayan yerlere geçici yeşil kare sprite, resimler ayarlanınca bina park vs. ile değiştirilecek
           road class'ının diğer türleri için getLines fonksiyonu yazılacak (sprite'ın dışına değil, yolun dışına çıktığında tetiklenecek)
             road nesnelerinin içinde şeridi temsil eden bir nesne olmalı. modelin şeridi geçmesinin ve yoldan çıkmasının ayrı değerlendirilebilmesi için gerekli
@@ -14,7 +14,6 @@
             prev array'indeki her elemanın next'te de bulunmasına bakması yeterli olur ama optimize edilebilir
           araçların iç ve dış hız değerleri farklı olmalı. araçların yönü hızına göre belirlendiği için bir araç çarparsa araç aniden yön değiştirir, önlemek içi ayrı hız değerleri kullanılıp hesaplamalarda ikisini beraber kullanacak bi hız değeri kullanılır. direction ve _direction'da olduğu gibi getter setter kullanılmalı
           trafik işaretleri, engeller ve farklı araçlar eklenmeli
-          aracın yavaşlayışı aracın baktığı açıya ve hıza göre olmalı (kaymaya yakın görünümdeykenki yavaşlama miktarı, düz giderkenkinden fazla olmalı)
           collision detection
             collision resolution
       MAYBE:
@@ -27,10 +26,10 @@
     const CAR_WIDTH = 48;
     const ROAD_WIDTH = 150
     const BARRIER_WIDTH = CAR_WIDTH/2
-    const DRAG = 4.4; // increases drag when increased, was meant to decrease
-    const TURN_DRAG = 1.5;
-    const MOVE_MULTIPLIER = 150; // acceleration, should be increased when drag is increased
-    const STEERING_MULTIPLIER = 1.5
+    const DRAG = 2; // increases drag when increased
+    const TURN_DRAG = 1.2;
+    const MOVE_MULTIPLIER = 60; // acceleration, should be increased when drag is increased
+    const STEERING_MULTIPLIER = 1.4
     const MIN_ALIGNMENT = 0.7
     const app = new PIXI.Application();
     const { BitmapText } = PIXI;
@@ -111,6 +110,7 @@
     let createMap = (grid,curr,fromDirection)=>{
       let firstInsert = !grid
       if(firstInsert){
+        //TODO: memoization eklendiğinde burada eski veriler silinmeli
         grid=Array(GRID_WIDTH).fill().map(e=>Array(GRID_HEIGHT).fill([-1,-1]))
         let initialY = Math.floor(Math.random()*GRID_HEIGHT)
         curr=[0,initialY]
@@ -235,14 +235,11 @@
       })
     ))
     let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
-    let tempSprite = PIXI.Sprite.from("../assets/temp_car.png");
-    let randSprite = PIXI.Sprite.from("../assets/temp_car.png");
     document.body.appendChild(app.canvas);
     app.canvas.style=""
     app.canvas.id="game"
     const GRID_WIDTH = WIDTH/ROAD_WIDTH
     const GRID_HEIGHT = HEIGHT/ROAD_WIDTH
-    let grid = []
     let entities = []
     window.GRID_WIDTH=GRID_WIDTH
     window.GRID_HEIGHT=GRID_HEIGHT
@@ -404,7 +401,6 @@
         */
         let width = this.scaledBounds[2]
         let height = this.scaledBounds[3]
-        let offsetAngleRad = Math.atan2(this.scaledBounds[0], this.scaledBounds[1])
         let startAngleRad = toRadian(this._direction)
         let xMultiplier = Math.cos(startAngleRad)
         let yMultiplier = Math.sin(startAngleRad)
@@ -483,15 +479,22 @@
       absoluteAcc() {
         return getMagnitude(this.accX, this.accY)
       }
+      getAlignment() {
+        return dotProduct(toUnitVector([this.velX, this.velY]), toVector(this._direction)) || 0
+      }
       tick(dt) {
         this.velX += this.accX * dt;
         this.velY += this.accY * dt;
-        let nextVelY = this.velY * DRAG * dt;
-        let nextVelX = this.velX * DRAG * dt;
-        this.accX = (nextVelX - this.velX) * DRAG;
-        this.accY = (nextVelY - this.velY) * DRAG;
-        this.posX += this.velX * dt;
-        this.posY += this.velY * dt;
+        let currAlignment = this.getAlignment()
+        let absAlignment = Math.abs(currAlignment)
+        let nextVelY = this.velY * dt
+        let nextVelX = this.velX * dt
+        this.accX = (nextVelX - this.velX) * DRAG
+        this.accY = (nextVelY - this.velY) * DRAG
+        let posChangeX = this.velX*dt*absAlignment
+        let posChangeY = this.velY*dt*absAlignment
+        this.posX += posChangeX
+        this.posY += posChangeY
         let absVel = this.absoluteVel();
         let absAcc = this.absoluteAcc();
         let nextAngle;
@@ -519,9 +522,9 @@
           this.accY = 0;
         }
         if (this.createGraphics) {
-          this.graphics.x = this.posX
-          this.graphics.y = this.posY
-          this.graphics.angle = this.sprite.angle
+          if(this.graphics.x!=this.posX)this.graphics.x = this.posX
+          if(this.graphics.y!=this.posY)this.graphics.y = this.posY
+          if(this.graphics.angle!=this.sprite.angle)this.graphics.angle = this.sprite.angle
         }
       }
       constructor() {
@@ -557,9 +560,6 @@
       // Geri hareket fonksiyonu
       moveBackward(dt = 1, scale = 1) {
         this.accelerate(dt * 1000, -scale / 2)
-      }
-      getAlignment() {
-        return dotProduct(toUnitVector([this.velX, this.velY]), toVector(this._direction)) || 0
       }
       isGoingBackwards(alignment = getAlignment()) {
         return alignment < 0
@@ -605,7 +605,6 @@
       }
     }
 
-    // Ana araç sınıfı
     class MainCar extends Car {
       constructor(spritePath) {
         super(spritePath, true);
@@ -631,11 +630,10 @@
       highlightLines;
       highlightToggles;
       drawHighlight(index){
-        let currentAngle = connectionLookup[getConnections(this.roadType,this._direction)[index]]*90-90 //TODO: -90 neden işe yaradı
+        let currentAngle = connectionLookup[getConnections(this.roadType,this._direction)[index]]*90-90 //sistem 0 dereceyi kuzey alıyor ama normalde doğu olmalı, o yüzden -90
         let targetX = this.posX+ROAD_WIDTH/2*Math.cos(toRadian(currentAngle))
         let targetY = this.posY+ROAD_WIDTH/2*Math.sin(toRadian(currentAngle))
         this.highlightLines[index].clear()
-        this.highlightLines[index].strokeWidth=20
         this.highlightLines[index].moveTo(this.posX, this.posY).lineTo(targetX,targetY).stroke();
       }
       toggleHighlight(index,value=!this.highlightToggles[index]){
@@ -709,8 +707,6 @@
     mainCar.setPosition(80, 50+roadOffsetY)
     let randCar = new Car("temp_car")
     randCar.setPosition(100, 100+roadOffsetY)
-    //let testRoad = new Road(TYPE_TO_IMAGE["3"],0,0)
-    //testRoad.setPosition(100,100)
     let tempBarrier = new Barrier(90,180)
     tempBarrier.setPosition(400,75)
     const ticker = PIXI.Ticker.system;
