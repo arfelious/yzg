@@ -1,7 +1,10 @@
     /*
       TODO:
+          dört yol ve yol3.png içerisindeyken yol bulucu bakılan yönü önemsememeli
+          yol bulucu, grid index değiştiğinde eski yol hala kullanılabiliyorsa onu kullanmalı, şu an çok değişiklik oluyor
+          kavisli yolda bakılan yön yanlış bulunuyor
           yol bulucunun çizdiği yolun sonuna görünürlüğü arttırmak amacıyla daire eklenecek
-          optimal yolu bulması isteniyorsa findPath memoization kullanmalı. her frame çalıştırmak istiyorsa optimizasyon için gerekiyor (sadece bir yoldan diğerine geçişte çalıştırmak daha mantıklı olur)
+          optimal yolu bulması isteniyorsa findPath memoization kullanmalı
           mobilde test için oyun kısmının dışına 4 adet buton, WASD ile yapıldığı gibi hareket edilmesini sağlayacak
           engine kısmı mainCar'ın yerleştirilmesi ve harita oluşturulması gibi kısımları içermemeli, ayrı bir game.mjs dosyası oluşturulabilir
           yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
@@ -26,11 +29,13 @@
     const CAR_WIDTH = 48;
     const ROAD_WIDTH = 150
     const BARRIER_WIDTH = CAR_WIDTH/2
-    const DRAG = 8.4; // increases drag when increased
+    const DRAG = 4.4; // increases drag when increased
     const TURN_DRAG = 1.2;
-    const MOVE_MULTIPLIER = 200; // acceleration, should be increased when drag is increased
+    const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
     const STEERING_MULTIPLIER = 1.4
     const MIN_ALIGNMENT = 0.7
+    const PATH_START_INDEX = 2
+    const HIGHLIGHT_STYLE = {color:0x006699,width:4}
     const app = new PIXI.Application();
     const { BitmapText } = PIXI;
     await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
@@ -67,7 +72,6 @@
     //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
     let intendedWidths = {"temp_car.png":[CAR_WIDTH,true]}
     ROAD_IMAGES.forEach(e=>intendedWidths[e]=[ROAD_WIDTH,false])
-    // Helper function to get the connections based on road type and angle
     const ROAD_TYPES = {"straight":[0,180],"rightcurve":[0,90],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
     let connectionArray = ["up","right","down","left"]
@@ -124,22 +128,24 @@
       let nextPossibleRoads=getNeighbours(curr)
       let currWeights = getWeights(grid)
       let currRoads = firstInsert?["straight"]:ROAD_TYPES_ARR.slice(0).sort((x,y)=>currWeights[x]-currWeights[y])
+      let tempGrid = grid.map(e=>e.slice(0)) //referansın üzerine yazmamak için kopyalanıyor
       for(let i = 0;i<currRoads.length;i++){
           let roadType = currRoads[i]
           let angles = randomAngles()
           for(let j=0;j<4;j++){
             let angle = angles[j]
-            let tempGrid=grid.map(e=>e.slice(0)) //referansın üzerine yazmamak için kopyalanıyor
             let possibleDirections = getConnections(roadType,angle)
             if(!possibleDirections.includes(fromDirection))continue
+            let iTempGrid = tempGrid
             possibleDirections=possibleDirections.filter(e=>e!=fromDirection)
             let mainNextDirection = roadType=="4"?getOpposite(fromDirection):roadType=="3"?angleLookup[angle]==fromDirection?possibleDirections[0]:getOpposite(fromDirection):roadType=="rightcurve"?possibleDirections[0]:possibleDirections[0]
             let nextCoords = nextPossibleRoads[connectionLookup[mainNextDirection]]
             let nextFromDirection = getOpposite(mainNextDirection)
-            tempGrid[curr[0]][curr[1]]=[ROAD_TYPES_OBJ[roadType],angle]
+            iTempGrid[curr[0]][curr[1]]=[ROAD_TYPES_OBJ[roadType],angle]
             if(inBounds(nextCoords)){
-              tempGrid = createMap(tempGrid,nextCoords,nextFromDirection)
-              if(!tempGrid)continue
+              let currTempGrid = createMap(tempGrid,nextCoords,nextFromDirection)
+              if(!currTempGrid)continue
+              iTempGrid=currTempGrid
             }//eğer harita sınırı dahilinde değilse sorun değil, şehir harita dışına uzuyor gibi olur sadece
             possibleDirections=possibleDirections.filter(e=>e!=mainNextDirection)
             let hasFailed = false
@@ -149,17 +155,17 @@
               let currCoords = nextPossibleRoads[directionIndex]
               let currFromDirection = getOpposite(currDirection)
               if(inBounds(currCoords)){
-                let currGrid=createMap(tempGrid,currCoords,currFromDirection)
+                let currGrid=createMap(iTempGrid,currCoords,currFromDirection)
                 if(!currGrid){
                   hasFailed=true
                   break;
                 }
-                tempGrid=currGrid
+                iTempGrid=currGrid
               }
             }
             if(!hasFailed){
-              if(firstInsert&&countInserted(tempGrid)/GRID_HEIGHT/GRID_HEIGHT<0.4)return createMap()
-              return tempGrid
+              if(firstInsert&&countInserted(iTempGrid)/GRID_HEIGHT/GRID_HEIGHT<0.4)return createMap()
+              return iTempGrid
             }
           }
       }
@@ -235,6 +241,7 @@
       })
     ))
     let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+    let noop = ()=>{}
     document.body.appendChild(app.canvas);
     app.canvas.style=""
     app.canvas.id="game"
@@ -304,11 +311,21 @@
       let retVal = [[xMin, yMin], [xMin, yMax], [xMax, yMin], [xMax, yMax]]
       return retVal
     }
+    let arrayEquals = (arr1,arr2)=>{
+      let len1 = arr1.length
+      let len2 = arr2.length
+      if(len1!=len2)return false
+      for(let i =0;i<len1;i++)if(arr1[i]!=arr2[i])return false
+      return true
+    }
     let collidersEquals = (prev, next) => {
       //TODO
       return false
     }
     class Entity {
+      tickCounter=0;
+      actionInterval=5 //kaç tick'te bir eylem alınacağı
+      isAutonomous=false
       zIndex = 2
       accX = 0;
       accY = 0;
@@ -332,6 +349,17 @@
       isMovable = true
       entityType = "generic"
       forceSquare = false
+      gridIndexes=[0,0]
+      onIndexChange=[]
+      childGraphics=[]
+      customDrawers=new Set()
+      addDrawer=fun=>{
+        this.customDrawers.add(fun)
+      }
+      removeDrawer=fun=>{
+        if(!fun)return
+        this.customDrawers.delete(fun)
+      }
       drawGraphics(clearRect) {
         if (!this.createGraphics) return
         if (clearRect) this.graphics.clear()
@@ -352,7 +380,7 @@
       }
       getFacingDirection(){
         let angle = (this.direction%360+360)%360
-        return connectionArray[Math.round(angle/90)]
+        return connectionArray[Math.round(angle/90)%4]
       }
       getColliders() {
         let currLines = this.getLines()
@@ -382,11 +410,12 @@
           this.lines.forEach(e => {
             e.setStrokeStyle(0x099ff)
             e.zIndex=1
-            app.stage.addChild(e)
           })
           this.collisionGraphics = new PIXI.Graphics()
-          app.stage.addChild(this.graphics);
-          app.stage.addChild(this.collisionGraphics);
+          this.childGraphics.push(this.graphics,this.collisionGraphics,...this.lines)
+          this.childGraphics.forEach(e=>{
+            app.stage.addChild(e)
+          })
           this.boundingRect = this.scaledBounds
             .map((e, i) => e - (i == 0 ? this.sprite.width * this.anchorX : i == 1 ? this.sprite.height * this.anchorY : 0))
           this.drawGraphics()
@@ -445,6 +474,7 @@
       setPosition(x, y) {
         this.posX = x
         this.posY = y
+        this.gridIndexes=getIndexes(x,y)
       }
       get position() {
         return [this.posX, this.posY]
@@ -495,6 +525,11 @@
         let posChangeY = this.velY*dt*absAlignment
         this.posX += posChangeX
         this.posY += posChangeY
+        let newIndexes = getIndexes(this.posX,this.posY)
+        if(!arrayEquals(this.gridIndexes,newIndexes)){
+          this.gridIndexes=newIndexes
+          this.onIndexChange.forEach(fun=>fun.call(this,this.gridIndexes,newIndexes))
+        }
         let absVel = this.absoluteVel();
         let absAcc = this.absoluteAcc();
         let nextAngle;
@@ -526,7 +561,14 @@
           if(this.graphics.y!=this.posY)this.graphics.y = this.posY
           if(this.graphics.angle!=this.sprite.angle)this.graphics.angle = this.sprite.angle
         }
+        this.customDrawers.forEach(fun=>fun())
+        if(this.tickCounter++%this.actionInterval==0&&this.isAutonomous){
+          let currAction = this.getAction()
+          this.execute(currAction)
+        }
       }
+      getAction=noop
+      execute=noop
       constructor() {
         entities.push(this)
       }
@@ -538,6 +580,64 @@
       _fillColor = 0xff9900
       shouldDraw = false
       drawCollision = true
+      path=[]
+      customLine=new PIXI.Graphics()
+      lineEnd
+      customLineDrawer
+      goal;
+      setGoal(x,y){
+        let currentDirection = mainCar.getFacingDirection()
+        this.goal=[x,y]
+        let currPath = findPathTo(x,y,true,currentDirection)
+        if(currPath){
+          this.setPath(currPath)
+        }else{
+          //TODO: bu yolun rengi farklı olmalı
+          currPath= findPathTo(x,y,true)
+          if(currPath){
+            this.setPath(currPath)
+          }
+        }
+      }
+      setPath(value){
+        this.path=value
+        let startIndex = drawPath(value)
+        if(startIndex===undefined)return
+        let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
+        let currRoad = roads[roadIndexes[0]][roadIndexes[1]]
+        let lineCoords = currRoad.getHighlightCoordinates(startIndex)
+        if(this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
+        this.lineEnd=lineCoords[0]
+        this.removeDrawer(this.customLineDrawer)
+        this.customLineDrawer = ()=>{
+          this.customLine.clear()
+          if(!this.lineEnd){
+            return this.removeGoal()
+          }
+          this.customLine.moveTo(this.posX,this.posY).lineTo(this.lineEnd[0],this.lineEnd[1]).stroke();
+        }
+        this.addDrawer(this.customLineDrawer)
+      }
+      removeGoal(){
+        this.customLine.clear()
+        this.removeDrawer(this.customLineDrawer)
+        this.goal=null
+      }
+      resetPath(){
+        if(this.goal){
+          let indexes = getIndexes(this.goal[0],this.goal[1])
+          if(arrayEquals(this.gridIndexes,indexes)){
+            this.removeGoal()
+            return
+          }
+          this.setGoal(this.goal[0],this.goal[1])
+        }
+      }
+      getAction(){
+        if(this.path){
+
+        }
+      }
       tick(dt) {
         super.tick(dt)
         let nextColliders = this.getColliders()
@@ -547,14 +647,13 @@
         this.lastColliders = nextColliders
         this.isUsingBrake = false
       }
-      // İleri hareket fonksiyonu
       accelerate(dt = 1, scale = 1) {
         let degree = this._direction;
         let radian = (Math.PI * degree) / 180;
         this.accX += (Math.cos(radian) * MOVE_MULTIPLIER * scale) * dt;
         this.accY += (Math.sin(radian) * MOVE_MULTIPLIER * scale) * dt;
       }
-      moveForward(dt = 1, scale = 1) { // 0-1.0, will necessary to control acceleration
+      moveForward(dt = 1, scale = 1) { // scale 0-1.0 arasında, ivmelenme kontrolünde lazım olacak
         this.accelerate(dt * 1000, scale)
       }
       // Geri hareket fonksiyonu
@@ -596,6 +695,8 @@
       }
       constructor(spritePath, createGraphics = false) {
         super()
+        this.onIndexChange.push(this.resetPath)
+        this.childGraphics.push(this.customLine)
         this.width = CAR_WIDTH
         this.createGraphics=createGraphics
         this.drawBounds=createGraphics
@@ -629,12 +730,19 @@
       highlightContainer;
       highlightLines;
       highlightToggles;
-      drawHighlight(index){
+      getHighlightCoordinates(index){
         let currentAngle = connectionLookup[getConnections(this.roadType,this._direction)[index]]*90-90 //sistem 0 dereceyi kuzey alıyor ama normalde doğu olmalı, o yüzden -90
-        let targetX = this.posX+ROAD_WIDTH/2*Math.cos(toRadian(currentAngle))
-        let targetY = this.posY+ROAD_WIDTH/2*Math.sin(toRadian(currentAngle))
+        return [[this.posX,this.posY],
+          [this.posX+ROAD_WIDTH/2*Math.cos(toRadian(currentAngle)),
+          this.posY+ROAD_WIDTH/2*Math.sin(toRadian(currentAngle))]
+        ]
+      }
+      drawHighlight(index){
+        let coords = this.getHighlightCoordinates(index)
+        let [startX,startY]=coords[0]
+        let [endX,endY]=coords[1]
         this.highlightLines[index].clear()
-        this.highlightLines[index].moveTo(this.posX, this.posY).lineTo(targetX,targetY).stroke();
+        this.highlightLines[index].moveTo(startX,startY).lineTo(endX,endY).stroke();
       }
       toggleHighlight(index,value=!this.highlightToggles[index]){
         if(Array.isArray(index))index.forEach(e=>this.toggleHighlight(e,value))
@@ -647,7 +755,7 @@
         }
         if(value){
           let curr=this.highlightLines[index]
-          curr.setStrokeStyle({color:0x006699,width:4})
+          curr.setStrokeStyle(HIGHLIGHT_STYLE)
           curr.zIndex=this.zIndex+1
           this.highlightContainer.addChild(curr)
           this.drawHighlight(index)
@@ -719,8 +827,8 @@
 
     // Klavye olayları
     window.addEventListener("keydown", (event) => {
-      const isLetter = /^[a-zA-Z ]$/.test(event.key);
-      if (isLetter && !event.repeat) {
+      const isValid = /^(Arrow|[a-zA-Z ]$)/.test(event.key);
+      if (isValid && !event.repeat) {
         isDown[event.key.toUpperCase()] = 1;
       }
       if (event.key == " ") {
@@ -736,54 +844,66 @@
     const FIXED_LOOP_MS = 7
     const FIXED_LOOP_S = FIXED_LOOP_MS / 1000
     let accumulatedTime = 0
+    let drawPath = (currPath,clearPrevious=true)=>{
+      if(clearPrevious){
+        roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_,i)=>e.toggleHighlight(i,false))))
+      }
+      if(!currPath)return
+      let retVal
+      let lastRoadIndex = currPath[1]
+      let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]]
+      let lastConnections = getConnections(lastRoad.roadType,lastRoad._direction)
+      if(currPath.length==2){
+        let firstRoadIndex = currPath[0]
+        let currentRelation=getRelativeDirection(firstRoadIndex,lastRoadIndex)
+        return lastConnections.indexOf(currentRelation)
+      }
+      let length=currPath.length
+      for(let i = PATH_START_INDEX;i<currPath.length;i++){
+        let currRoadIndex = currPath[i]
+        let currentRelation = getRelativeDirection(lastRoadIndex,currRoadIndex)
+        let highlightInPrevious = getOpposite(currentRelation)
+        let currRoad=roads[currRoadIndex[0]][currRoadIndex[1]]
+        let currentConnections = getConnections(currRoad.roadType,currRoad._direction)
+        let indexLast = lastConnections.indexOf(highlightInPrevious)
+        let indexCurr = currentConnections.indexOf(currentRelation)
+        if(i==PATH_START_INDEX){
+          retVal=length==2?indexCurr:indexLast
+        }
+        lastRoad.toggleHighlight(indexLast,true)
+        currRoad.toggleHighlight(indexCurr,true)
+        lastRoadIndex=currRoadIndex
+        lastRoad=currRoad
+        lastConnections=currentConnections
+      }
+      return retVal
+    }
     app.canvas.onpointerup=e=>{
       let rect = e.target.getBoundingClientRect();
       let scale = WIDTH/rect.width
       let x = (e.clientX - rect.left)*scale;
       let y = (e.clientY - rect.top)*scale;
-      roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_,i)=>e.toggleHighlight(i,false))))
-      let currentDirection = mainCar.getFacingDirection()
-      let currPath = findPathTo(x,y,true,currentDirection)
-      if(currPath){
-        let lastRoadIndex = currPath[0]
-        let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]]
-        let lastConnections = getConnections(lastRoad.roadType,lastRoad._direction)
-        for(let i = 1;i<currPath.length;i++){
-          let currRoadIndex = currPath[i]
-          let currentRelation = getRelativeDirection(lastRoadIndex,currRoadIndex)
-          let highlightInPrevious = getOpposite(currentRelation)
-          let currRoad=roads[currRoadIndex[0]][currRoadIndex[1]]
-          let currentConnections = getConnections(currRoad.roadType,currRoad._direction)
-          lastRoad.toggleHighlight(lastConnections.indexOf(highlightInPrevious),true)
-          currRoad.toggleHighlight(currentConnections.indexOf(currentRelation),true)
-          lastRoadIndex=currRoadIndex
-          lastRoad=currRoad
-          lastConnections=currentConnections
-        }
-      }
+      mainCar.setGoal(x,y)
     }
     let updateLoop = () => {
       let now = Date.now()
       let diff = now - lastUpdate
-      let deltaTime = diff / 1000
       accumulatedTime += diff
       while (accumulatedTime >= FIXED_LOOP_MS) {
-        if (isDown["W"] || isDown["A"] || isDown["D"] || isDown["S"] || isDown[" "]) {
-          if (isDown[" "]) {
-            mainCar.brake(FIXED_LOOP_S)
-          }
-          if (isDown["W"]) {
-            mainCar.moveForward(FIXED_LOOP_S);
-          }
-          if (isDown["S"]) {
-            mainCar.moveBackward(FIXED_LOOP_S);
-          }
-          if (isDown["A"]) {
-            mainCar.steerLeft(FIXED_LOOP_S)
-          }
-          if (isDown["D"]) {
-            mainCar.steerRight(FIXED_LOOP_S)
-          }
+        if (isDown[" "]) {
+          mainCar.brake(FIXED_LOOP_S)
+        }
+        if (isDown["W"]||isDown["ARROWUP"]) {
+          mainCar.moveForward(FIXED_LOOP_S);
+        }
+        if (isDown["S"]||isDown["ARROWDOWN"]) {
+          mainCar.moveBackward(FIXED_LOOP_S);
+        }
+        if (isDown["A"]||isDown["ARROWLEFT"]) {
+          mainCar.steerLeft(FIXED_LOOP_S)
+        }
+        if (isDown["D"]||isDown["ARROWRIGHT"]) {
+          mainCar.steerRight(FIXED_LOOP_S)
         }
         entities.forEach(entity => {
           entity.tick(FIXED_LOOP_S);
