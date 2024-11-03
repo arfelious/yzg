@@ -1100,7 +1100,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
         });
         this.globalColliders=new Set()
       }
-      static graphicsTick(){
+      static graphicsTick(dt){
         //Happens every frame
         entities.forEach(e => e.setGraphics())
       }
@@ -1233,7 +1233,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
     }
     setInterval(updateLoop, FIXED_LOOP_MS)
     ticker.add((dt) => {
-      Game.graphicsTick()
+      Game.graphicsTick(dt)
       frameTimes.push(Date.now());
     });
 
