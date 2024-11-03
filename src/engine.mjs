@@ -1,6 +1,7 @@
     /*
       TODO:
           GENEL OPTİMİZASYON
+          Kod okunurluğu arttırılacak, kod tekrarı düşürülecek
           hareketsiz nesnelerin collision çizgileri kaydedilip kullanılmalı
           hareketli nesnelerin collisoin çizgileri de 1 tick süresi kadar kaydedilmeli
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
@@ -554,11 +555,11 @@
       tick() {
         if(this.sprite.x!=this.posX){
           this.sprite.x = this.posX;
-          //this.childContainer.x = this.posX
+          this.childContainer.x = this.posX
         }
         if(this.sprite.y!=this.posY){
           this.sprite.y = this.posY;
-          //this.childContainer.y=this.posY
+          this.childContainer.y=this.posY
         }
         if (this.createGraphics) {
           if(this.graphics.x!=this.posX)this.graphics.x = this.posX
@@ -567,7 +568,7 @@
         }
         this.customDrawers.forEach(fun=>fun())
         if(this.childContainer.angle!=this.direction){
-          //this.childContainer.angle=this.direction
+          this.childContainer.angle=this.direction
         }
         if(this.isImmovable){
           this.sprite.angle=this.direction
@@ -982,11 +983,14 @@
         */
         let xMultiplier = Math.cos(toRadian(this.parent._direction))
         let yMultiplier = Math.sin(toRadian(this.parent._direction))
-
+        let xBaseMultiplier = Math.cos(toRadian(-this.parent.directionOffset))
+        let yBaseMultiplier = Math.sin(toRadian(-this.parent.directionOffset))
         let xOffset = this.xOffset*xMultiplier+this.yOffset*yMultiplier
         let yOffset = this.xOffset*yMultiplier+this.yOffset*xMultiplier
-        let startX = (isOffset?0:this.parent.posX)+xOffset
-        let startY = (isOffset?0:this.parent.posY)+yOffset
+        let xBaseOffset = this.xOffset*xBaseMultiplier+this.yOffset*yBaseMultiplier
+        let yBaseOffset = this.xOffset*yBaseMultiplier+this.yOffset*xBaseMultiplier
+        let startX = (isOffset?xBaseOffset:this.parent.posX+xOffset)
+        let startY = (isOffset?yBaseOffset:this.parent.posY+yOffset)
         let degree = toRadian(isOffset?this.offsetDegree:this.offsetDegree+this.parent.direction)
         let lineEnd = [startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
         return [[[startX,startY],lineEnd]]
@@ -1016,9 +1020,9 @@
           })
           this.output=min
         }
-        if(isColliding!=this.lastColliding||true){
+        if(isColliding!=this.lastColliding){
           this.graphics.setStrokeStyle(isColliding?{color:0xff0000}:{color:0x0000ff})
-          this.drawLine()
+          this.drawLine(true)
           this.lastColliding=isColliding
         }
       }
