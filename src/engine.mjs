@@ -2,8 +2,8 @@
       TODO:
           GENEL OPTİMİZASYON
           Kod okunurluğu arttırılacak, kod tekrarı düşürülecek
-          hareketsiz nesnelerin collision çizgileri kaydedilip kullanılmalı
-          hareketli nesnelerin collisoin çizgileri de 1 tick süresi kadar kaydedilmeli
+          hareketsiz nesnelerin collision çizgileri posX ve posY güncellenince de silinmeli
+          sensörlerin collision çizgileri kaydedilmeli
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
           game class'ı haritayı ve entity'leri barındırmalı, istenmesi durumunda yeniden başlatılabilmeli
           tüm nesnelerin alt nesnelere dair property'si olmalı, araçlarda bu customLine'ı tutacak, yollarda highlightLines ve engelleri tutacak
@@ -387,6 +387,7 @@
       childGraphics=[]
       customDrawers=new Set()
       childContainer=new PIXI.Container()
+      cachedLines
       addDrawer=fun=>{
         this.customDrawers.add(fun)
       }
@@ -463,6 +464,7 @@
       }
       a = 0
       getLines() {
+        if(this.cachedLines)return this.cachedLines
         /*
           A----B
           |    |
@@ -488,7 +490,7 @@
         let CD = [C, D]
         let DA = [D, A]
         this.shouldDraw = true
-        return [AB, BC, CD, DA]
+        return this.cachedLines=[AB, BC, CD, DA]
       }
       setGraphics() {
         if (this.shouldDraw) {
@@ -515,6 +517,7 @@
         this.posX = x
         this.posY = y
         this.gridIndexes=getIndexes(x,y)
+        this.cachedLines=null
       }
       get position() {
         return [this.posX, this.posY]
@@ -572,7 +575,7 @@
         }
         if(this.isImmovable){
           this.sprite.angle=this.direction
-        }
+        }else this.cachedLines=null
       }
       getAction=noop
       execute=noop
@@ -807,61 +810,9 @@
         super(spritePath, true);
       }
     }
-    // Yol koşullarına ve dönüş etkisine göre ivme ve sürtünmeyi hesaplayan fonksiyon
-function calculateVehicleProperties(roadCondition, isTurning = false) {
-  let acceleration, friction;
-
-  // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
-  switch (roadCondition) {
-      case "asphalt":
-               // Temel hız katsayısına göre hız
-          acceleration = 3;                    // m/s²
-          friction = 0.9;                      // Sürtünme katsayısı
-          break;
-      case "dirt":
-         
-          acceleration = 2;
-          friction = 0.7;
-          break;
-      case "slippery":
-        
-          acceleration = 1.5;
-          friction = 0.4;
-          break;
-      default:
-               // Varsayılan yol hızı
-          acceleration = 1;
-          friction = 0.5;
-  }
-  // El freni çekildiğinde sürtünme artar, hız düşer, ve dönüşler daha keskin olur
-  if (TURN_DRAG) {
-             
-    friction *= DRAG * 1.5;    // Sürtünme artar, kayma etkisi olur
-    acceleration *= 0.7;       // İvme azalır
-}
- 
-
-  // DRAG katsayısı sürtünme değerine eklenir
-  friction *= DRAG;
-
-  return { acceleration, friction };
-}
-
-// Örnek kullanım: Yol koşuluna ve dönüş durumuna göre araç özelliklerini al
-const roadCondition = "asphalt"; // Yol koşulu: "asphalt", "dirt", "slippery" gibi
-const isTurning = true; // Dönüşte olup olmadığını belirt
-
-
-// Araç özelliklerini hesapla
-const vehicleProperties = calculateVehicleProperties(roadCondition, isTurning);
-
-// Konsola yazdırma
-console.log("Yol Koşulu:", roadCondition);
-
-console.log("Araç Özellikleri:", vehicleProperties);
-
     class Road extends Entity {
       getLines(){
+        if(this.cachedLines)return this.cachedLines
         const GREEN = 47
         const ROAD = 49
         const RATIO = GREEN/(GREEN+ROAD)/2
@@ -947,7 +898,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
             }
           }
         }
-        return retVal
+        return this.cachedLines=retVal
       }
       highlightContainer;
       highlightLines;
@@ -1091,6 +1042,41 @@ console.log("Araç Özellikleri:", vehicleProperties);
         this.drawLine(true)
       }
     }
+    function calculateVehicleProperties(roadCondition, isTurning = false) {
+      let acceleration, friction;
+      // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
+      switch (roadCondition) {
+          case "asphalt":
+                   // Temel hız katsayısına göre hız
+              acceleration = 3;                    // m/s²
+              friction = 0.9;                      // Sürtünme katsayısı
+              break;
+          case "dirt":
+             
+              acceleration = 2;
+              friction = 0.7;
+              break;
+          case "slippery":
+            
+              acceleration = 1.5;
+              friction = 0.4;
+              break;
+          default:
+                   // Varsayılan yol hızı
+              acceleration = 1;
+              friction = 0.5;
+      }
+      // El freni çekildiğinde sürtünme artar, hız düşer, ve dönüşler daha keskin olur
+      if (TURN_DRAG) {
+                 
+        friction *= DRAG * 1.5;    // Sürtünme artar, kayma etkisi olur
+        acceleration *= 0.7;       // İvme azalır
+    }
+     
+      // DRAG katsayısı sürtünme değerine eklenir
+      friction *= DRAG;
+      return { acceleration, friction };
+    }
     class Game{
       static globalColliders=new Set()
       static tick(dt){
@@ -1100,7 +1086,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
         });
         this.globalColliders=new Set()
       }
-      static graphicsTick(dt){
+      static graphicsTick(){
         //Happens every frame
         entities.forEach(e => e.setGraphics())
       }
@@ -1206,6 +1192,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
       }
       mainCar.setGoal(x,y)
     }
+
     let updateLoop = () => {
       let now = Date.now()
       let diff = now - lastUpdate
@@ -1233,7 +1220,7 @@ console.log("Araç Özellikleri:", vehicleProperties);
     }
     setInterval(updateLoop, FIXED_LOOP_MS)
     ticker.add((dt) => {
-      Game.graphicsTick(dt)
+      Game.graphicsTick()
       frameTimes.push(Date.now());
     });
 
