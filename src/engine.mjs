@@ -93,7 +93,7 @@
       return connectionArray[(connectionLookup[direction]+2)%4]
     }
     let getNextDirection = (roadType,angle,fromDirection,possibleDirections=getConnections(roadType,angle))=>{
-      return roadType=="4"?getOpposite(fromDirection):roadType=="3"?angleLookup[angle]==fromDirection?possibleDirections[0]:getOpposite(fromDirection):roadType=="rightcurve"?possibleDirections[0]:possibleDirections[0]
+      return roadType=="4"?getOpposite(fromDirection):roadType=="3"?angleLookup[angle]==fromDirection?possibleDirections[0]:getOpposite(fromDirection):roadType=="rightcurve"?possibleDirections.find(e=>e!=fromDirection):possibleDirections[0]
     }
     let getRelativeDirection = (p1,p2)=>{
       //p1 p2'ye gidiyorsa hangi yönden geldiği
@@ -216,7 +216,7 @@
         if(forcedIsArray){
           leftConnections=leftConnections.filter(e=>forcedDirection.includes(e))
         }else if(leftConnections.includes(forcedDirection)){
-        leftConnections=[forcedDirection]
+          leftConnections=[forcedDirection]
         }
       }
       let currMinimumLength=Infinity
@@ -291,13 +291,14 @@
       return (Q[0] < Math.max(P[0], R[0]) && Q[0] > Math.min(P[0], R[0]) &&
         Q[1] < Math.max(P[1], R[1]) && Q[1] > Math.min(P[1], R[1]));
     }
+    //bunun türetilişine bakılacak
     let getIntersectionPoint = (line1,line2)=>{
       let [A,B] = line1
       let [C,D] = line2
-      const x1 = A[0], y1 = A[1];
-      const x2 = B[0], y2 = B[1];
-      const x3 = C[0], y3 = C[1];
-      const x4 = D[0], y4 = D[1];
+      const [x1,y1]=A
+      const [x2,y2]=B
+      const [x3,y3]=C
+      const [x4,y4]=D
       const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
       if (denominator === 0) {
           return null;
@@ -324,7 +325,7 @@
       let extracted = app.renderer.extract.pixels(sprite)
       let xMin = 255, yMin = 255, xMax = 0, yMax = 0
       let pixels = extracted.pixels
-      let { width, height } = extracted
+      let { width } = extracted
       let pixelsLength = pixels.length
       for (let i = 0; i < pixelsLength; i += 4) {
         let index = i / 4
@@ -354,7 +355,7 @@
     }
     class Entity {
       isImmovable=true
-      isCollisionEffective=false
+      isCollisionEffected=false
       tickCounter=0;
       actionInterval=5 //kaç tick'te bir eylem alınacağı
       isAutonomous=false
@@ -627,12 +628,15 @@
           this.accX = 0;
           this.accY = 0;
         }
-        if(this.tickCounter++%this.actionInterval==0&&this.isAutonomous){
-          let currAction = this.getAction()
-          this.lastAction=currAction
+        if(this.isAutonomous){
+          if(this.tickCounter%this.actionInterval==0){
+            let currAction = this.getAction()
+            this.lastAction=currAction
+          }
+          if(this.lastAction)this.execute(this.lastAction)
         }
-        if(this.lastAction)this.execute(this.lastAction)
         super.tick()
+        this.tickCounter++
       }
     }
     class Car extends MovableEntity {
@@ -660,11 +664,9 @@
         let currRoad = roads[this.gridIndexes[0]]
         if(currRoad)currRoad=currRoad[this.gridIndexes[1]]
         let currRoadType = currRoad?.roadType
-        if(currRoad){
-          //TODO: fix this
-          if(currRoadType=="rightcurve")fromDirection=[fromDirection,currentDirection]
-        }
-        let nextDirection = currRoad?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
+        //TODO: fix this
+        //T şeklindeki yolda karşılıklı olmayan yerden gelen araç için gelinen yöne izin verilmemeli
+        let nextDirection = (currRoadType=="4"||currRoadType=="3"||currRoadType=="rightcurve")?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
         this.goal=[x,y]
         let currPath = findPathTo(x,y,true,nextDirection)
         if(currPath){
