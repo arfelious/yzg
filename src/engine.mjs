@@ -807,6 +807,59 @@
         super(spritePath, true);
       }
     }
+    // Yol koşullarına ve dönüş etkisine göre ivme ve sürtünmeyi hesaplayan fonksiyon
+function calculateVehicleProperties(roadCondition, isTurning = false) {
+  let acceleration, friction;
+
+  // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
+  switch (roadCondition) {
+      case "asphalt":
+               // Temel hız katsayısına göre hız
+          acceleration = 3;                    // m/s²
+          friction = 0.9;                      // Sürtünme katsayısı
+          break;
+      case "dirt":
+         
+          acceleration = 2;
+          friction = 0.7;
+          break;
+      case "slippery":
+        
+          acceleration = 1.5;
+          friction = 0.4;
+          break;
+      default:
+               // Varsayılan yol hızı
+          acceleration = 1;
+          friction = 0.5;
+  }
+  // El freni çekildiğinde sürtünme artar, hız düşer, ve dönüşler daha keskin olur
+  if (TURN_DRAG) {
+             
+    friction *= DRAG * 1.5;    // Sürtünme artar, kayma etkisi olur
+    acceleration *= 0.7;       // İvme azalır
+}
+ 
+
+  // DRAG katsayısı sürtünme değerine eklenir
+  friction *= DRAG;
+
+  return { acceleration, friction };
+}
+
+// Örnek kullanım: Yol koşuluna ve dönüş durumuna göre araç özelliklerini al
+const roadCondition = "asphalt"; // Yol koşulu: "asphalt", "dirt", "slippery" gibi
+const isTurning = true; // Dönüşte olup olmadığını belirt
+
+
+// Araç özelliklerini hesapla
+const vehicleProperties = calculateVehicleProperties(roadCondition, isTurning);
+
+// Konsola yazdırma
+console.log("Yol Koşulu:", roadCondition);
+
+console.log("Araç Özellikleri:", vehicleProperties);
+
     class Road extends Entity {
       getLines(){
         const GREEN = 47
