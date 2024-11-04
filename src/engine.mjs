@@ -1,6 +1,7 @@
     /*
       TODO:
           GENEL OPTİMİZASYON
+          sensörlerde getGrids düzgün çalışmıyor, collision kontrolünü filtrelemek için yeterli değil
           customCoords ile sensor line'ın mesafesi kesişim durumunda azaltılacak, bitiş koordinatı olarak customCoords verilecek
           Kod okunurluğu arttırılacak, kod tekrarı düşürülecek
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
@@ -444,7 +445,7 @@
         let currGrids = this.currentGrids
         return entities.filter(e => {
           let cachedGrids =e.currentGrids
-          if (e == this||e.entityType=="sensor"||cachedGrids.isDisjointFrom(currGrids)) return false
+          if (e == this||e.entityType=="sensor"||(this.entityType!="sensor"&&cachedGrids.isDisjointFrom(currGrids))) return false
           let entityLines = e.getLines()
           return currLines.find(l1 => {
             let retVal = entityLines.find(l2 => checkIntersects(l1[0],l1[1],l2[0],l2[1]))
@@ -836,6 +837,12 @@
       }
     }
     export class Road extends Entity {
+      getGrids(){
+        let indexes = new Set()
+        let curr = this.gridIndexes.join(",")
+        indexes.add(curr)
+        return indexes
+      }
       getLines(){
         if(this.cachedLines)return this.cachedLines
         const GREEN = 47
@@ -1027,7 +1034,7 @@
         let startX = (isOffset?xBaseOffset:this.parent.posX+xOffset)
         let startY = (isOffset?yBaseOffset:this.parent.posY+yOffset)
         let degree = toRadian(isOffset?this.offsetDegree:this.offsetDegree+this.parent.direction)
-        let lineEnd = this.customCoords?isOffset?[this.customCoords[0]-this.parent.posX,this.customCoords[1]-this.parent.posY]:this.customCoords:[startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
+        let lineEnd = [startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
         
         return [[[startX,startY],lineEnd]]
       }
