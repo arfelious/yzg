@@ -1,9 +1,8 @@
     /*
       TODO:
           GENEL OPTİMİZASYON
+          customCoords ile sensor line'ın mesafesi kesişim durumunda azaltılacak, bitiş koordinatı olarak customCoords verilecek
           Kod okunurluğu arttırılacak, kod tekrarı düşürülecek
-          hareketsiz nesnelerin collision çizgileri posX ve posY güncellenince de silinmeli
-          sensörlerin collision çizgileri kaydedilmeli
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
           game class'ı haritayı ve entity'leri barındırmalı, istenmesi durumunda yeniden başlatılabilmeli
           tüm nesnelerin alt nesnelere dair property'si olmalı, araçlarda bu customLine'ı tutacak, yollarda highlightLines ve engelleri tutacak
@@ -27,22 +26,21 @@
       MAYBE:
         visualize buttons as they are being pressed, might be necessary when RL model is used
       */
-    // Oyun ekranı boyutları
-    const WIDTH = 1200;
-    const HEIGHT = 900;
-    // Araç özellikleri
-    const CAR_WIDTH = 48;
-    const ROAD_WIDTH = 150
-    const BARRIER_WIDTH = CAR_WIDTH/2
-    const DRAG = 4.4; // increases drag when increased
-    const TURN_DRAG = 1.2;
-    const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
-    const STEERING_MULTIPLIER = 1.4
-    const MIN_ALIGNMENT = 0.7
-    const PATH_START_INDEX = 2
-    const HIGHLIGHT_STYLE = {color:0x006699,width:4}
-    const app = new PIXI.Application();
-    const { BitmapText } = PIXI;
+    // Sabitler
+    export const WIDTH = 1200;
+    export const HEIGHT = 900;
+    export const CAR_WIDTH = 48;
+    export const ROAD_WIDTH = 150
+    export const BARRIER_WIDTH = CAR_WIDTH/2
+    export const DRAG = 4.4; // increases drag when increased
+    export const TURN_DRAG = 1.2;
+    export const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
+    export const STEERING_MULTIPLIER = 1.4
+    export const MIN_ALIGNMENT = 0.7
+    export const PATH_START_INDEX = 2
+    export const HIGHLIGHT_STYLE = {color:0x006699,width:4}
+    export const app = new PIXI.Application();
+    export const { BitmapText } = PIXI;
     await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
     let staticContainer = new PIXI.Container();
     app.stage.addChild(staticContainer)
@@ -73,9 +71,9 @@
     const IMAGE_TO_TYPE = {"duzyol.png":"straight","yol1.png":"rightcurve","yol3.png":"3","dortyol.png":"4"}
     const TYPE_TO_IMAGE = {"straight":"duzyol.png","rightcurve":"yol1.png","3":"yol3.png","4":"dortyol.png"}
     const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e,i)=>[e,i]))
-    let imagesArray = ["temp_car.png", "bariyerr.png",...ROAD_IMAGES]
+    let imagesArray = ["temp_car.png", "bariyerr.png","ocean.jpeg",...ROAD_IMAGES]
     //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
-    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true]}
+    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH]}
     ROAD_IMAGES.forEach(e=>intendedWidths[e]=[ROAD_WIDTH,false])
     const ROAD_TYPES = {"straight":[0,180],"rightcurve":[90,180],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
@@ -354,6 +352,7 @@
       return false
     }
     class Entity {
+      game;
       isImmovable=true
       isCollisionEffected=false
       tickCounter=0;
@@ -380,7 +379,6 @@
       createGraphics = false
       drawBounds=false
       collisionBounds
-      isMovable = true
       entityType = "generic"
       forceSquare = false
       gridIndexes=[0,0]
@@ -389,6 +387,24 @@
       customDrawers=new Set()
       childContainer=new PIXI.Container()
       cachedLines
+      currentGrids=new Set()
+      getGrids(){
+        //Array'de olup olmadığının hızlı anlaşılması için string olarak tutulması gerekiyor
+        let lines = this.getLines()
+        let points = lines.map(e=>e[0])
+        let indexes = new Set()
+        let saved = {};
+        let curr = this.gridIndexes.join(",")
+        indexes.add(curr)
+        saved[curr]=true
+        points.map(e=>getIndexes(e[0],e[1])).forEach(e=>{
+          let curr = e.join(",")
+          if(saved[curr])return
+          indexes.add(curr)
+          saved[curr]=true
+        })
+        return indexes
+      }
       addDrawer=fun=>{
         this.customDrawers.add(fun)
       }
@@ -425,8 +441,10 @@
       }
       getColliders() {
         let currLines = this.getLines()
+        let currGrids = this.currentGrids
         return entities.filter(e => {
-          if (e == this||e.entityType=="sensor") return false
+          let cachedGrids =e.currentGrids
+          if (e == this||e.entityType=="sensor"||cachedGrids.isDisjointFrom(currGrids)) return false
           let entityLines = e.getLines()
           return currLines.find(l1 => {
             let retVal = entityLines.find(l2 => checkIntersects(l1[0],l1[1],l2[0],l2[1]))
@@ -519,6 +537,7 @@
         this.posY = y
         this.gridIndexes=getIndexes(x,y)
         this.cachedLines=null
+        this.currentGrids=this.getGrids()
       }
       get position() {
         return [this.posX, this.posY]
@@ -576,15 +595,19 @@
         }
         if(this.isImmovable){
           this.sprite.angle=this.direction
-        }else this.cachedLines=null
+        }else{
+          this.cachedLines=null
+          this.currentGrids=this.getGrids()
+        }
       }
       getAction=noop
       execute=noop
-      constructor() {
+      constructor(game) {
         entities.push(this)
+        this.game=game
       }
     }
-    class MovableEntity extends Entity{
+    export class MovableEntity extends Entity{
       isImmovable=false
       tick(dt) {
         this.velX += this.accX * dt;
@@ -639,7 +662,7 @@
         this.tickCounter++
       }
     }
-    class Car extends MovableEntity {
+    export class Car extends MovableEntity {
       isMain=false
       isUsingBrake = false
       anchorX = 0.3
@@ -654,7 +677,7 @@
       goal;
       sensors=[]
       addSensor(degree,lengthMultiplier=1,xOffset=0){
-        let sensor = new Sensor(degree,this,lengthMultiplier*CAR_WIDTH,xOffset)
+        let sensor = new Sensor(this.game,degree,this,lengthMultiplier*CAR_WIDTH,xOffset)
         this.childContainer.addChild(sensor.graphics)
         this.sensors.push(sensor)
       }
@@ -685,10 +708,10 @@
       }
       setPath(value){
         this.path=value
-        let startIndex = drawPath(value)
+        let startIndex = drawPath(this.game.roads,value)
         if(startIndex===undefined)return
         let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
-        let currRoad = roads[roadIndexes[0]][roadIndexes[1]]
+        let currRoad = this.game.roads[roadIndexes[0]][roadIndexes[1]]
         let lineCoords = currRoad.getHighlightCoordinates(startIndex)
         if(this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
         this.lineEnd=lineCoords[0]
@@ -734,7 +757,7 @@
         super.tick(dt)
         let nextColliders = this.getColliders()
         this.fillColor = nextColliders.length == 0 ? 0xff9900 : 0xff0000
-        Game.globalColliders.add(nextColliders)
+        this.game.globalColliders.add(nextColliders)
         this.lastColliders = nextColliders
         this.isUsingBrake = false
       }
@@ -784,8 +807,8 @@
       destroy() {
         cars.splice(cars.indexOf(this), 1)
       }
-      constructor(spritePath, createGraphics = false) {
-        super()
+      constructor(game,spritePath, createGraphics = false) {
+        super(game)
         this.onIndexChange.push(this.resetPath)
         this.childGraphics.push(this.customLine)
         this.width = CAR_WIDTH
@@ -793,26 +816,26 @@
         this.drawBounds=createGraphics
         this.sprite = spritePath
         this.entityType = "car"
-        this.addSensor(-this.directionOffset-10,0.7,20)
-        this.addSensor(-this.directionOffset+10,0.7,20)
+        this.addSensor(-this.directionOffset-10,1.4,20)
+        this.addSensor(-this.directionOffset+10,1.4,20)
         this.addSensor(this.directionOffset-10,0.5)
         this.addSensor(this.directionOffset+10,0.5)
         for(let i = 0;i<3;i++){
-          this.addSensor(this.directionOffset+90+i*10,0.5,i*10)
-          this.addSensor(this.directionOffset-90-i*10,0.5,i*10)
+          this.addSensor(this.directionOffset+90+i*10,0.7,i*10)
+          this.addSensor(this.directionOffset-90-i*10,0.7,i*10)
         }
 
         cars.push(this);
       }
     }
 
-    class MainCar extends Car {
+    export class MainCar extends Car {
       isMain=true
-      constructor(spritePath) {
-        super(spritePath, true);
+      constructor(game,spritePath) {
+        super(game,spritePath, true);
       }
     }
-    class Road extends Entity {
+    export class Road extends Entity {
       getLines(){
         if(this.cachedLines)return this.cachedLines
         const GREEN = 47
@@ -938,8 +961,8 @@
         this.highlightToggles[index]=value
         this.highlightLines[index].visible=value
       }
-      constructor(spritePath, directionOffset, direction) {
-        super()
+      constructor(game,spritePath, directionOffset, direction) {
+        super(game)
         this.anchorX=0.5
         this.anchorY=0.5
         this.entityType="road"
@@ -958,9 +981,9 @@
         this.highlightLines=Array(this.roadAmount).fill()
       }
     }
-    class Barrier extends MovableEntity{
-      constructor(directionOffset=90,direction=0){
-        super()
+    export class Barrier extends MovableEntity{
+      constructor(game,directionOffset=90,direction=0){
+        super(game)
         this.entityType="barrier"
         this.width=BARRIER_WIDTH
         this.directionOffset = directionOffset
@@ -968,7 +991,18 @@
         this.sprite="bariyerr"
       }
     }
-    class Sensor extends MovableEntity{
+    export class Ocean extends Entity{
+      constructor(game){
+        super(game)
+        this.forceSquare=true
+        this.entityType="ocean"
+        this.width=ROAD_WIDTH
+        this.sprite="ocean.jpeg"
+        this.sprite.zIndex=5
+        this.sprite.tint=0x00ffaa
+      }
+    }
+    export class Sensor extends MovableEntity{
       parent
       offsetDegree
       graphics=new PIXI.Graphics()
@@ -977,16 +1011,11 @@
       output;
       xOffset=0
       yOffset=0
+      customCoords;
       getColliders(){
         return super.getColliders().filter(e=>e!=this.parent)
       }
       getLines(isOffset){
-        /*
-        let anchorOffsetX = anchorX * xMultiplier - anchorY * yMultiplier
-        let anchorOffsetY = anchorX * yMultiplier + anchorY * xMultiplier
-        let xOffset = this.posX - anchorOffsetX
-        let yOffset = this.posY - anchorOffsetY
-        */
         let xMultiplier = Math.cos(toRadian(this.parent._direction))
         let yMultiplier = Math.sin(toRadian(this.parent._direction))
         let xBaseMultiplier = Math.cos(toRadian(-this.parent.directionOffset))
@@ -998,10 +1027,12 @@
         let startX = (isOffset?xBaseOffset:this.parent.posX+xOffset)
         let startY = (isOffset?yBaseOffset:this.parent.posY+yOffset)
         let degree = toRadian(isOffset?this.offsetDegree:this.offsetDegree+this.parent.direction)
-        let lineEnd = [startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
+        let lineEnd = this.customCoords?isOffset?[this.customCoords[0]-this.parent.posX,this.customCoords[1]-this.parent.posY]:this.customCoords:[startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
+        
         return [[[startX,startY],lineEnd]]
       }
       drawLine(isOffset,curr=this.getLines(isOffset)[0]){
+        this.cachedLines=null
         this.graphics.clear()
         this.graphics.moveTo(curr[0][0],curr[0][1]).lineTo(curr[1][0],curr[1][1]).stroke()
       } 
@@ -1009,6 +1040,7 @@
         let currColliders=this.getColliders()
         let isColliding=currColliders.length>0
         let currLine = this.getLines()[0]
+        let coords = null
         if(isColliding){
           let min = [this.length,null]
           currColliders.forEach(collider=>{
@@ -1016,6 +1048,7 @@
             colliderLines.forEach(line=>{
               if(checkIntersects(currLine[0],currLine[1],line[0],line[1])){
                 let point = getIntersectionPoint(currLine,line)
+                coords=point
                 let distance = getMagnitude(point[0]-currLine[0],point[1]-currLine[1])
                 if(distance<min[0]){
                   min=[min,collider]
@@ -1024,6 +1057,7 @@
               }
             }) 
           })
+          //this.customCoords=coords??null
           this.output=min
         }
         if(isColliding!=this.lastColliding){
@@ -1031,9 +1065,10 @@
           this.drawLine(true)
           this.lastColliding=isColliding
         }
+        this.currentGrids=this.getGrids()
       }
-      constructor(degree,parent,length=CAR_WIDTH,xOffset=0){
-        super()
+      constructor(game,degree,parent,length=CAR_WIDTH,xOffset=0){
+        super(game)
         this.xOffset=xOffset
         this.entityType="sensor"
         this.length=length
@@ -1079,78 +1114,27 @@
       friction *= DRAG;
       return { acceleration, friction };
     }
-    class Game{
-      static globalColliders=new Set()
-      static tick(dt){
-        //Happens per physics calculation
-        entities.forEach(entity => {
-          entity.tick(dt);
-        });
-        this.globalColliders=new Set()
-      }
-      static graphicsTick(){
-        //Happens every frame
-        entities.forEach(e => e.setGraphics())
-      }
-    }
     app.stage.sortableChildren = true
-    let currMap = createMap()
-    let possibleStarts = []
-    let roads = []
-    window.roads=roads
-    for (let i = 0; i < GRID_WIDTH; i++) {
-      roads[i]=[]
-      for (let j = 0; j < GRID_HEIGHT; j++) {
-        let curr = currMap[i][j]
-        if(curr[0]==-1)continue
-        if(i==0&&curr[0]==0&&(curr[1]==90||curr[1]==270))possibleStarts.push(j)
-        let tempRoad = new Road(TYPE_TO_IMAGE[ROAD_TYPES_ARR[curr[0]]], 0, curr[1])
-        roads[i][j]=tempRoad
-        tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
-      }
+    let getConnectedEdge = (grid,curr,known={},arr=[])=>{
+      if(known[curr])return
+      if(curr[0]<0||curr[0]>=GRID_WIDTH||curr[1]<0||curr[1]>=GRID_HEIGHT)return
+      let currNeighbours = getNeighbours(curr).filter(e=>grid[e[0]]&&grid[e[0]][e[1]]&&grid[e[0]][e[1]][0]===-1)
+      known[curr]=true
+      arr.push(curr)
+      currNeighbours.forEach(e=>getConnectedEdge(grid,e,known,arr))
+      return arr
     }
-    let currentStart = possibleStarts[Math.floor(Math.random()*possibleStarts.length)]
-    let roadOffsetY = currentStart*ROAD_WIDTH
-    let mainCar = new MainCar("temp_car");
-    window.mainCar = mainCar
-    mainCar.setPosition(80, 50+roadOffsetY)
-    let randCar = new Car("temp_car")
-    randCar.setPosition(100, 100+roadOffsetY)
-    let tempBarrier = new Barrier(90,180)
-    tempBarrier.setPosition(400,75)
-    const ticker = PIXI.Ticker.system;
-    window.ticker = ticker
-    window.stage = app.stage
-    window.app=app
-    //testing section, will be deleted
-    let frameTimes = [];
-    let isDown = {};
-
-    // Klavye olayları
-    window.addEventListener("keydown", (event) => {
-      const isValid = /^(Arrow|[a-zA-Z ]$)/.test(event.key);
-      if (isValid && !event.repeat) {
-        isDown[event.key.toUpperCase()] = 1;
-      }
-      if (event.key == " ") {
-        event.preventDefault()
-      }
-    });
-    window.addEventListener("keyup", (event) => {
-      delete isDown[event.key.toUpperCase()];
-    });
-    let frameText = "0";
-    let counter = 0;
-    let lastUpdate = Date.now()
-    const FIXED_LOOP_MS = 7
-    const FIXED_LOOP_S = FIXED_LOOP_MS / 1000
-    let accumulatedTime = 0
-    let clearPath = ()=>{
+    let getEdge = grid=>{
+      return grid.map((e,i)=>e.map((e,i)=>[e,i]).filter(e=>e[0][0]==-1&&(i==0||i==GRID_WIDTH-1||e[1]==0||e[1]==GRID_HEIGHT-1)).map(w=>{
+        return [[i,w[1]],getConnectedEdge(grid,[i,w[1]])]
+      })).flat().sort((x,y)=>y[1].length-x[1].length)?.[0]?.[1]
+    }
+    let clearPath = (roads)=>{
       roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_,i)=>e.toggleHighlight(i,false))))
     }
-    let drawPath = (currPath,clearPrevious=true)=>{
+    let drawPath = (roads,currPath,clearPrevious=true)=>{
       if(clearPrevious){
-        clearPath()
+        clearPath(roads)
       }
       if(!currPath)return
       if(currPath.length<2)return
@@ -1183,74 +1167,61 @@
       }
       return retVal
     }
-    app.canvas.onpointerup=e=>{
-      let rect = e.target.getBoundingClientRect();
-      let scale = WIDTH/rect.width
-      let x = (e.clientX - rect.left)*scale;
-      let y = (e.clientY - rect.top)*scale;
-      if(mainCar.goal&&arrayEquals(getIndexes(mainCar.goal[0],mainCar.goal[1]),getIndexes(x,y))){
-        mainCar.removeGoal()
-        return
+    export class Game{
+      roads;
+      map;
+      entities=[]
+      globalColliders=new Set()
+      possibleStarts=[]
+      tick(dt){
+        //Happens per physics calculation
+        entities.forEach(entity => {
+          entity.tick(dt);
+        });
+        this.globalColliders=new Set()
       }
-      mainCar.setGoal(x,y)
+      graphicsTick(){
+        //Happens every frame
+        entities.forEach(e => e.setGraphics())
+      }
+      setMap(){
+        this.map=createMap()
+      }
+      setRoads(){
+        let roads = []
+        for (let i = 0; i < GRID_WIDTH; i++) {
+          roads[i]=[]
+          for (let j = 0; j < GRID_HEIGHT; j++) {
+            let curr = this.map[i][j]
+            if(curr[0]==-1)continue
+            if(i==0&&curr[0]==0&&(curr[1]==90||curr[1]==270))this.possibleStarts.push(j)
+            let tempRoad = new Road(this,TYPE_TO_IMAGE[ROAD_TYPES_ARR[curr[0]]], 0, curr[1])
+            roads[i][j]=tempRoad
+            tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
+          }
+        }
+        this.roads=roads
+      }
+      setEmpty(){
+        //TODO: yeşil sprite, park, bina vs. yerleştirilmesi
+        //boş kısımların doldurulması
+        let maxEdge = getEdge(this.map)
+        if(maxEdge&&maxEdge.length>=2){
+          maxEdge.forEach(e=>{
+            let currOcean = new Ocean(game)
+            let [i,j] = e
+            currOcean.setPosition(ROAD_WIDTH*(i+1),ROAD_WIDTH*j)
+          })
+        }
+      }
+      setMapExtras(){
+        //TODO:
+        //levha, engel vs. yerleştirilmesi
+      }
+      constructor(){
+        this.setMap()
+        this.setEmpty()
+        this.setMapExtras()
+        this.setRoads()
+      }
     }
-
-    let updateLoop = () => {
-      let now = Date.now()
-      let diff = now - lastUpdate
-      accumulatedTime += diff
-      while (accumulatedTime >= FIXED_LOOP_MS) {
-        if (isDown[" "]) {
-          mainCar.brake(FIXED_LOOP_S)
-        }
-        if (isDown["W"]||isDown["ARROWUP"]) {
-          mainCar.moveForward(FIXED_LOOP_S);
-        }
-        if (isDown["S"]||isDown["ARROWDOWN"]) {
-          mainCar.moveBackward(FIXED_LOOP_S);
-        }
-        if (isDown["A"]||isDown["ARROWLEFT"]) {
-          mainCar.steerLeft(FIXED_LOOP_S)
-        }
-        if (isDown["D"]||isDown["ARROWRIGHT"]) {
-          mainCar.steerRight(FIXED_LOOP_S)
-        }
-        Game.tick(FIXED_LOOP_S)
-        accumulatedTime -= FIXED_LOOP_MS
-      }
-      lastUpdate = now
-    }
-    setInterval(updateLoop, FIXED_LOOP_MS)
-    ticker.add((dt) => {
-      Game.graphicsTick()
-      frameTimes.push(Date.now());
-    });
-
-
-    // FPS Sayacı
-    let fpsFontSize = 20
-    const bitmapFontText = new BitmapText({
-      text: frameText,
-      style: {
-        fontFamily: "Desyrel",
-        fontSize: fpsFontSize,
-        align: "left",
-      },
-    });
-    bitmapFontText.x = (WIDTH - fpsFontSize) / 2
-    bitmapFontText.y = 0;
-    app.stage.addChild(bitmapFontText);
-    let modelIdentifier = Math.random().toString(36).slice(2)
-    let model = await fetch("https://bilis.im/yzgmodel").then(r=>r.json(),()=>{})
-    // FPS Hesaplama
-    let secondCounter = 0
-    setInterval(() => {
-      let now = Date.now();
-      frameTimes = frameTimes.filter((e) => now - e < 1000);
-      frameText = frameTimes.length.toString();
-      bitmapFontText.text = frameText;
-      bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2
-      if(secondCounter++%30==0){
-        fetch("https://bilis.im/yzgmodelGuncelle",{method:"POST",body:JSON.stringify({identifier:modelIdentifier,model:model}),headers:{"content-type":"application/json"}}).then(r=>r.text(),()=>{})
-      }
-    }, 1000);
