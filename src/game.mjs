@@ -1,4 +1,4 @@
-import {app,WIDTH,HEIGHT,Game,Car,MainCar,ROAD_WIDTH,BitmapText} from "../src/engine.mjs"
+import {app,WIDTH,HEIGHT,Game,Car,MainCar,ROAD_WIDTH,BitmapText,arrayEquals,getIndexes} from "../src/engine.mjs"
 let game = new Game()
 let currentStart = game.possibleStarts[Math.floor(Math.random()*game.possibleStarts.length)]
 let roadOffsetY = currentStart*ROAD_WIDTH

@@ -234,7 +234,7 @@
       }
       return res
     }
-    let findPathTo = (x,y,getMinimumDistance,forceInitialDirection)=>{
+    let findPathTo = (currMap,x,y,getMinimumDistance,forceInitialDirection)=>{
       let gridIndexes = getIndexes(x,y)
       let [gridX,gridY] = gridIndexes
       let gridElement = currMap[gridX][gridY]
@@ -318,7 +318,7 @@
       if (o4 == 0 && isOnLineSegment(C, B, D)) return true;
       return false;
     }
-    let getIndexes = (x,y)=>[Math.floor(x/ROAD_WIDTH),Math.floor(y/ROAD_WIDTH)]
+    export let getIndexes = (x,y)=>[Math.floor(x/ROAD_WIDTH),Math.floor(y/ROAD_WIDTH)]
     let toDegree = (x) => (x / Math.PI) * 180;
     let getBounds = sprite => {
       let extracted = app.renderer.extract.pixels(sprite)
@@ -341,7 +341,7 @@
       let retVal = [[xMin, yMin], [xMin, yMax], [xMax, yMin], [xMax, yMax]]
       return retVal
     }
-    let arrayEquals = (arr1,arr2)=>{
+    export let arrayEquals = (arr1,arr2)=>{
       let len1 = arr1.length
       let len2 = arr2.length
       if(len1!=len2)return false
@@ -685,14 +685,14 @@
       setGoal(x,y){
         let currentDirection = mainCar.getFacingDirection()
         let fromDirection = getOpposite(currentDirection)
-        let currRoad = roads[this.gridIndexes[0]]
+        let currRoad = this.game.roads[this.gridIndexes[0]]
         if(currRoad)currRoad=currRoad[this.gridIndexes[1]]
         let currRoadType = currRoad?.roadType
         //TODO: fix this
         //T şeklindeki yolda karşılıklı olmayan yerden gelen araç için gelinen yöne izin verilmemeli
         let nextDirection = (currRoadType=="4"||currRoadType=="3"||currRoadType=="rightcurve")?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
         this.goal=[x,y]
-        let currPath = findPathTo(x,y,true,nextDirection)
+        let currPath = findPathTo(this.game.map,x,y,true,nextDirection)
         if(currPath){
           this.setPath(currPath)
         }else{
@@ -732,7 +732,7 @@
         this.customLine.clear()
         this.removeDrawer(this.customLineDrawer)
         this.goal=null
-        clearPath()
+        clearPath(this.game.roads)
       }
       resetPath(){
         if(this.goal){
@@ -1005,7 +1005,7 @@
         this.entityType="ocean"
         this.width=ROAD_WIDTH
         this.sprite="ocean.jpeg"
-        this.sprite.zIndex=5
+        this.sprite.zIndex=0
         this.sprite.tint=0x00ffaa
       }
     }
