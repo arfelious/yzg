@@ -205,7 +205,7 @@
       if(currX==road2Indexes[0]&&currY==road2Indexes[1]){
         return visited
       }
-      let left = grid[road1Indexes[0]][road1Indexes[1]]
+      let left = grid[road1Indexes[0]][road1Indexes[1]] //208
       if(left[0]==-1)return false
       let leftNeighbours=getNeighbours(road1Indexes)
       let leftConnections = getConnections(ROAD_TYPES_ARR[left[0]],left[1]).map(e=>leftNeighbours[connectionLookup[e]])
@@ -234,12 +234,13 @@
       }
       return res
     }
-    let findPathTo = (currMap,x,y,getMinimumDistance,forceInitialDirection)=>{
+    let findPathTo = function(x,y,getMinimumDistance,forceInitialDirection){
       let gridIndexes = getIndexes(x,y)
       let [gridX,gridY] = gridIndexes
-      let gridElement = currMap[gridX][gridY]
+      let gridElement = this.game.map[gridX][gridY]
       if(gridElement[0]==-1)return false
-      let res = findPath(currMap,getIndexes(mainCar.posX,mainCar.posY),gridIndexes,getMinimumDistance,forceInitialDirection)
+      console.log(this.posX,this.posY)
+      let res = findPath(this.game.map,getIndexes(this.posX,this.posY),gridIndexes,getMinimumDistance,forceInitialDirection)//242
       return res
     }
     let imagePaths = {}
@@ -358,7 +359,7 @@
       isCollisionEffected=false
       tickCounter=0;
       actionInterval=5 //kaç tick'te bir eylem alınacağı
-      isAutonomous=false
+      isAutonomous=true
       collisionLineAmount=4
       zIndex = 2
       accX = 0;
@@ -601,8 +602,7 @@
           this.currentGrids=this.getGrids()
         }
       }
-      getAction=noop
-      execute=noop
+      
       constructor(game) {
         entities.push(this)
         this.game=game
@@ -654,10 +654,10 @@
         }
         if(this.isAutonomous){
           if(this.tickCounter%this.actionInterval==0){
-            let currAction = this.getAction()
+            let currAction = this.getAction(dt)
             this.lastAction=currAction
           }
-          if(this.lastAction)this.execute(this.lastAction)
+          if(this.lastAction)this.lastAction(dt)
         }
         super.tick()
         this.tickCounter++
@@ -692,12 +692,12 @@
         //T şeklindeki yolda karşılıklı olmayan yerden gelen araç için gelinen yöne izin verilmemeli
         let nextDirection = (currRoadType=="4"||currRoadType=="3"||currRoadType=="rightcurve")?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
         this.goal=[x,y]
-        let currPath = findPathTo(this.game.map,x,y,true,nextDirection)
+        let currPath = findPathTo.call(this,x,y,true,nextDirection)//694
         if(currPath){
           this.setPath(currPath)
         }else{
           //TODO: bu yolun rengi farklı olmalı
-          currPath= findPathTo(x,y,true)
+          currPath= findPathTo.call(this,x,y,true)
           if(currPath){
             this.setPath(currPath)
           }
@@ -748,12 +748,58 @@
           this.setPath(this.path.slice(foundIndex))
         }
       }
-      getAction(){
-        //TODO: rule based actions
-        if(this.path){
-
-        }
+      getAction(dt) {
+        let threatAction = this.getThreatAction();
+        if (threatAction !== null) return threatAction;
+      
+        let ruleAction = this.getRuleAction();
+        if (ruleAction !== null) return ruleAction;
+      
+        let goalAction = this.getGoalAction(dt);
+        if (goalAction !== null) return goalAction;
+      
+        return null;
       }
+      getThreatAction() {
+        // Şu anda kullanılmıyor
+        return null;
+      }
+      
+      getRuleAction() {
+        // Şu anda kullanılmıyor
+        return null;
+      }
+
+      getGoalAction(dt) {
+        if (this.path && this.path.length > 0) {
+          return this._getGoalAction(dt);
+        }
+        return null;
+      }
+      
+      _getGoalAction(dt) {
+        let [targetGridX, targetGridY] = this.path[1] || this.path[0]; // İlk hedef grid noktasını al
+        let targetX = targetGridX * ROAD_WIDTH + ROAD_WIDTH / 2; // Mutlak X koordinatı
+        let targetY = targetGridY * ROAD_WIDTH + ROAD_WIDTH / 2; // Mutlak Y koordinatı
+        let dx = targetX - this.posX;
+        let dy = targetY - this.posY;
+      
+        // Hedefe doğru açıyı hesapla
+        let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
+        let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
+      
+        // Yön ayarlaması yap
+        if (angleDifference > 2) {
+          this.steerRight(dt);
+        } else if (angleDifference < -2) {
+          this.steerLeft(dt);
+        }
+      
+        // Araç belirlenen yöne doğru ileri hareket etsin
+        this.moveForward(dt);
+      }
+    
+      
       tick(dt) {
         super.tick(dt)
         let nextColliders = this.getColliders()
@@ -761,7 +807,30 @@
         this.game.globalColliders.add(nextColliders)
         this.lastColliders = nextColliders
         this.isUsingBrake = false
+        this.getAction(dt);
+        // if (this.path && this.path.length > 0) {
+        //   let [targetGridX, targetGridY] = this.path[1]||this.path[0]; // İlk hedef grid noktasını al
+        //   let targetX = targetGridX * ROAD_WIDTH + ROAD_WIDTH / 2; // Mutlak X koordinatı
+        //   let targetY = targetGridY * ROAD_WIDTH + ROAD_WIDTH / 2; // Mutlak Y koordinatı
+        //     let dx = targetX - this.posX;
+        //     let dy = targetY - this.posY;
+        //     //Hedefe doğru açıyı hesapla
+        //     let angleToTarget =toDegree( Math.atan2(dy, dx) ); // Hedef açısı
+        //     let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
+      
+        //     // Yön ayarlaması yap
+        //     if (angleDifference > 3) {
+        //       this.steerRight(dt); // Sağ tarafa küçük bir açısal dönüş yap
+        //     } else if (angleDifference < -3) {
+        //       this.steerLeft(dt); // Sol tarafa küçük bir açısal dönüş yap
+        //     }
+      
+        //     //Araç belirlenen yöne doğru ileri hareket etsin
+        //     this.moveForward(dt);
+        // }
       }
+      
+      
       accelerate(dt = 1, scale = 1) {
         let degree = this._direction;
         let radian = toRadian(degree)
