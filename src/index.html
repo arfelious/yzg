@@ -11,6 +11,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        overflow: hidden;
       }
       #game {
         height: 100vh;
@@ -18,12 +19,27 @@
         max-width: 100%;
         background-color: lightgray;
       }
+
       /* ---------------- WASD Kontrol Butonları ------------------ */
-      .control-button {
+      #control-container {
         position: absolute;
+        bottom: 17%;
+        right: 5%;
+        display: grid;
+        grid-template-areas:
+          ". up ."
+          "left down right";
+        gap: 5px;
+        justify-items: center;
+      }
+
+      /* İlk satırda butonlar */
+      .control-button {
         width: 60px;
         height: 60px;
         background-color: rgba(0, 0, 0, 0.6);
+        border: 3px solid grey;
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.360);
         color: white;
         font-size: 24px;
         border-radius: 20px;
@@ -32,26 +48,54 @@
         align-items: center;
         cursor: pointer;
         user-select: none;
+        transition: background-color 0.3s ease, transform 0.2s ease;
       }
+      .control-button:active{
+        background-color: rgba(3, 146, 139, 0.774);
+        transform: scale(0.98)
+      }
+
       #control-up {
-        top: 70%;
-        left: 50%;
-        transform: translate(-50%, 30%);
+        grid-area: up;
       }
       #control-left {
-        top: 80%;
-        left: 40%;
-        transform: translate(-100%, 50%);
+        grid-area: left;
       }
       #control-down {
-        top: 80%;
-        left: 50%;
-        transform: translate(-50%, 50%);
+        grid-area: down;
       }
       #control-right {
-        top: 80%;
-        left: 60%;
-        transform: translate(0%, 50%);
+        grid-area: right;
+      }
+
+      /* ------------------------------------------------------ */
+
+      /* Space butonu grid dışına yerleştirilecek */
+      #control-brake-container {
+        position: absolute;
+        bottom: 7%; /* Space butonunun yeri */
+        right: 4.5%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #control-brake {
+        width: 200px;
+        height: 60px;
+        background-color: rgba(0, 0, 0, 0.6);
+        border: 5px solid grey;
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.360);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+      }
+      #control-brake:active{
+        background-color: rgba(3, 146, 139, 0.774);
+        transform: scale(0.98)
       }
 
       /* ------------------------------------------------------ */
@@ -63,6 +107,20 @@
           position: absolute;
           top: 0;
         }
+        #control-container {
+          position: absolute;
+          bottom: 15%;
+          left: 50%;
+          transform: translateX(-55%); /* Sayfa ortasında konumlandır */
+        }
+
+        /* Brake container'ı yatayda ortala */
+        #control-brake-container {
+          position: absolute;
+          bottom: 5%;
+          left: 50%;
+          transform: translateX(-50%); /* Sayfa ortasında konumlandır */
+        }
       }
     </style>
   </head>
@@ -71,12 +129,21 @@
     <div id="game"></div>
 
     <!-- WASD Mobile Kontrol Butonları -->
-    <div id="buttons">
-      <div id="control-up" class="control-button">W</div>
+    <div id="control-container">
       <div id="control-left" class="control-button">A</div>
-      <div id="control-down" class="control-button">S</div>
+      <div id="control-up" class="control-button">W</div>
       <div id="control-right" class="control-button">D</div>
+      <div id="control-down" class="control-button">S</div>
     </div>
+
+    <!-- Space butonu grid dışına -->
+    <div id="control-brake-container">
+      <div id="control-brake">
+        <img src="/assets/space-icon.png" alt="Space" style="width: 150px; height: 30px;" />
+      </div>
+    </div>
+    
+
     <script src="../modules/pixi.js"></script>
     <script src="../modules/tf.min.js"></script>
     <script type="module" src="engine.mjs"></script>

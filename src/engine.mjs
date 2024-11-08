@@ -1044,7 +1044,7 @@
         this.entityType="road"
         this.zIndex = 0
         this.createGraphics=true
-        this.drawCollision=true
+        this.drawCollision=false
         this.forceSquare = true
         this.width = ROAD_WIDTH
         this.directionOffset = directionOffset
