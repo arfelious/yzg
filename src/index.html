@@ -1,39 +1,85 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-  <title>YZG</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    #game {
+  <head>
+    <title>YZG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      #game {
         height: 100vh;
         width: auto;
         max-width: 100%;
         background-color: lightgray;
-    }
-    @media (max-width: 767px) {
+      }
+      /* ---------------- WASD Kontrol Butonları ------------------ */
+      .control-button {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-size: 24px;
+        border-radius: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+      }
+      #control-up {
+        top: 70%;
+        left: 50%;
+        transform: translate(-50%, 30%);
+      }
+      #control-left {
+        top: 80%;
+        left: 40%;
+        transform: translate(-100%, 50%);
+      }
+      #control-down {
+        top: 80%;
+        left: 50%;
+        transform: translate(-50%, 50%);
+      }
+      #control-right {
+        top: 80%;
+        left: 60%;
+        transform: translate(0%, 50%);
+      }
+
+      /* ------------------------------------------------------ */
+
+      @media (max-width: 767px) {
         #game {
-            width: 100vw  !important;
-            height: auto !important;
-            position: absolute;
-            top:0;
+          width: 100vw !important;
+          height: auto !important;
+          position: absolute;
+          top: 0;
         }
-    }
-  </style>
-</head>
+      }
+    </style>
+  </head>
 
-<body>
-  <script src="../modules/pixi.js"></script>
-  <script src="../modules/tf.min.js"></script>
-  <script type="module" src="engine.mjs"></script>
-  <script type="module" src="game.mjs"></script>
-</body>
+  <body>
+    <div id="game"></div>
 
+    <!-- WASD Mobile Kontrol Butonları -->
+    <div id="buttons">
+      <div id="control-up" class="control-button">W</div>
+      <div id="control-left" class="control-button">A</div>
+      <div id="control-down" class="control-button">S</div>
+      <div id="control-right" class="control-button">D</div>
+    </div>
+    <script src="../modules/pixi.js"></script>
+    <script src="../modules/tf.min.js"></script>
+    <script type="module" src="engine.mjs"></script>
+    <script type="module" src="game.mjs"></script>
+  </body>
 </html>
