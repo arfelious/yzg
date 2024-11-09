@@ -789,14 +789,14 @@ this.spriteWidth=this.spriteWidth??this.width
       
       _getGoalAction(dt) {
         if (!this.path||this.path.length==0)return
-        let currRoad = this.path[0]
-        let currGoal = this.path[1] || currRoad
+        let currGoal = this.path[1] || this.path[0]
         let [targetGridX, targetGridY] = currGoal;
-        //şerit ihlalini engellemiyor, değiştirilecek
-        let direction = getRelativeDirection(this.gridIndexes,currRoad)
+        //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
+        let relativeDirection = getRelativeDirection(this.path.length>1?this.path[0]:this.gridIndexes,currGoal)
+        let direction = relativeDirection
         let index = connectionLookup[direction]
         const LINE_OFFSET = ROAD_WIDTH/6
-        let offsetArr = [[LINE_OFFSET,0],[0,LINE_OFFSET],[-LINE_OFFSET,0],[0,-LINE_OFFSET]]
+        let offsetArr = [[-LINE_OFFSET,0],[0,-LINE_OFFSET],[LINE_OFFSET,0],[0,LINE_OFFSET]]
         let [xOffset,yOffset]=offsetArr[index]
         let targetX = targetGridX * ROAD_WIDTH + ROAD_WIDTH / 2+xOffset; // Mutlak X koordinatı
         let targetY = targetGridY * ROAD_WIDTH + ROAD_WIDTH / 2+yOffset; // Mutlak Y koordinatı
