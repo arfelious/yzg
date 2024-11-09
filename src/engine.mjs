@@ -358,6 +358,7 @@
       game;
       isImmovable=true
       isCollisionEffected=false
+      shouldDraw;
       tickCounter=0;
       actionInterval=5 //kaç tick'te bir eylem alınacağı
       isAutonomous=true
@@ -416,6 +417,7 @@
         this.customDrawers.delete(fun)
       }
       drawGraphics(clearRect) {
+        if(this.game.destroyed)return
         if (!this.createGraphics) return
         if (clearRect) this.graphics.clear()
         if(this.drawBounds){
@@ -522,7 +524,7 @@ this.spriteWidth=this.spriteWidth??this.width
         }
       }
       set fillColor(value) {
-        if (this.graphics) {
+        if (this.graphics&&!this.graphics.destroyed) {
           this.graphics.fill(value)
           this.shouldDraw = true
         }
@@ -605,7 +607,18 @@ this.spriteWidth=this.spriteWidth??this.width
           this.currentGrids=this.getGrids()
         }
       }
-      
+      destroy(){
+        this.shouldDraw=false
+        entities.splice(entities.indexOf(this),1)
+        if(this.sprite)this.sprite.destroy(true)
+        if(this.childGraphics){
+          this.childGraphics.forEach(e=>e.destroy(true))
+        }
+        if(this.childContainer){
+          this.childContainer.children.forEach(e=>e.destroy(true))
+          this.childContainer.destroy()
+        }
+      }
       constructor(game) {
         entities.push(this)
         this.game=game
@@ -680,7 +693,6 @@ this.spriteWidth=this.spriteWidth??this.width
       anchorX = 0.3
       anchorY = 0.5
       _fillColor = 0xff9900
-      shouldDraw = false
       drawCollision = false
       path=[]
       customLine=new PIXI.Graphics()
@@ -726,10 +738,11 @@ this.spriteWidth=this.spriteWidth??this.width
         let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
         let currRoad = this.game.roads[roadIndexes[0]][roadIndexes[1]]
         let lineCoords = currRoad.getHighlightCoordinates(startIndex)
-        if(this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
+        if(!this.customLine.destroyed&&this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
         this.lineEnd=lineCoords[0]
         this.removeDrawer(this.customLineDrawer)
         this.customLineDrawer = ()=>{
+          if(this.customLine.destroyed)return
           this.customLine.clear()
           if(!this.lineEnd){
             return this.removeGoal()
@@ -741,7 +754,7 @@ this.spriteWidth=this.spriteWidth??this.width
       }
       removeGoal(){
         this.path=null
-        this.customLine.clear()
+        if(this.customLine&&!this.customLine.destroyed)this.customLine.clear()
         this.removeDrawer(this.customLineDrawer)
         this.goal=null
         clearPath(this.game.roads)
@@ -808,9 +821,9 @@ this.spriteWidth=this.spriteWidth??this.width
         let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
         let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
         // Yön ayarlaması yap
-        if (angleDifference > 2) {
+        if (angleDifference > 3) {
           this.steerRight(dt);
-        } else if (angleDifference < -2) {
+        } else if (angleDifference < -3) {
           this.steerLeft(dt);
         }
         this.moveForward(dt);
@@ -869,6 +882,10 @@ this.spriteWidth=this.spriteWidth??this.width
         this.isUsingBrake = true
       }
       destroy() {
+        super.destroy()
+        this.shouldDraw=false
+        this.drawCollision=false
+        this.customLine.destroy()
         cars.splice(cars.indexOf(this), 1)
       }
       constructor(game,spritePath, createGraphics = false) {
@@ -1023,6 +1040,7 @@ this.spriteWidth=this.spriteWidth??this.width
         }
         if(value){
           let curr=this.highlightLines[index]
+          if(curr.destroyed)return
           curr.setStrokeStyle(HIGHLIGHT_STYLE)
           curr.zIndex=this.zIndex+1
           this.highlightContainer.addChild(curr)
@@ -1030,6 +1048,10 @@ this.spriteWidth=this.spriteWidth??this.width
         }
         this.highlightToggles[index]=value
         this.highlightLines[index].visible=value
+      }
+      destroy(){
+        super.destroy()
+        this.highlightLines.forEach(e=>e&&e.destroy(true))
       }
       constructor(game,spritePath, directionOffset, direction) {
         super(game)
@@ -1200,9 +1222,14 @@ export class BuildingSide extends Entity{
       }
       drawLine(isOffset,curr=this.getLines(isOffset)[0]){
         this.cachedLines=null
+        if(this.graphics.destroyed)return
         this.graphics.clear()
         this.graphics.moveTo(curr[0][0],curr[0][1]).lineTo(curr[1][0],curr[1][1]).stroke()
       } 
+      destroy(){
+        super.destroy()
+        this.graphics.destroy()
+      }
       tick=()=>{
         let currColliders=this.getColliders()
         let isColliding=currColliders.length>0
@@ -1228,7 +1255,7 @@ export class BuildingSide extends Entity{
           this.output=min
         }
         if(isColliding!=this.lastColliding){
-          this.graphics.setStrokeStyle(isColliding?{color:0xff0000}:{color:0x0000ff})
+          if(!this.graphics.destroyed)this.graphics.setStrokeStyle(isColliding?{color:0xff0000}:{color:0x0000ff})
           this.drawLine(true)
           this.lastColliding=isColliding
         }
@@ -1340,6 +1367,7 @@ export class BuildingSide extends Entity{
       entities=[]
       globalColliders=new Set()
       possibleStarts=[]
+      destroyed=false
       tick(dt){
         //Happens per physics calculation
         entities.forEach(entity => {
@@ -1348,6 +1376,7 @@ export class BuildingSide extends Entity{
         this.globalColliders=new Set()
       }
       graphicsTick(){
+        if(this.destroyed)return
         //Happens every frame
         entities.forEach(e => e.setGraphics())
       }
@@ -1395,7 +1424,13 @@ export class BuildingSide extends Entity{
         //TODO:
         //levha, engel vs. yerleştirilmesi
       }
-      constructor(){
+      destroy(){
+        this.destroyed=true
+        if(this.stage)this.stage.children.forEach(e=>this.stage.removeChild(e))
+        entities.forEach(e=>e.destroy())
+      }
+      constructor(stage){
+        this.stage=stage
         this.setMap()
         this.setEmpty()
         this.setMapExtras()
