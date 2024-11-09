@@ -11,7 +11,7 @@ import {
   getIndexes,
 } from "../src/engine.mjs";
 
-let game = new Game();
+let game = new Game(app.stage);
 let currentStart =
   game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
@@ -50,7 +50,6 @@ const stopMove = (direction) => {
   clearInterval(moveIntervals[direction]);
   moveIntervals[direction] = null;
 };
-
 // Butonlara olay dinleyicileri ekleme
 const addControlListeners = (button, direction) => {
   button.addEventListener("pointerdown", () => startMove(direction));
@@ -160,8 +159,10 @@ setInterval(() => {
   let now = Date.now();
   frameTimes = frameTimes.filter((e) => now - e < 1000);
   frameText = frameTimes.length.toString();
-  bitmapFontText.text = frameText;
-  bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2;
+  if(!bitmapFontText.destroyed&&!game.destroyed){
+    bitmapFontText.text = frameText;
+    bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2;
+  }
   if (secondCounter++ % 30 == 0) {
     fetch("https://bilis.im/yzgmodelGuncelle", {
       method: "POST",
