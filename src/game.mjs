@@ -34,15 +34,16 @@ let moveIntervals = {};
 
 const startMove = (direction) => {
   if (moveIntervals[direction]) return; // Aynı yönde zaten hareket varsa tekrarlamayı engelle
-  
 
-  moveIntervals[direction] = setInterval(() => {
-    if (direction === "up") mainCar.moveForward(0.01);
-    if (direction === "down") mainCar.moveBackward(0.01);
-    if (direction === "left") mainCar.steerLeft(0.01);
-    if (direction === "right") mainCar.steerRight(0.01);
-    if (direction === "brake") mainCar.brake(0.01);
-  }, 8);
+  const actions = {
+    up: () => mainCar.moveForward(0.01),
+    down: () => mainCar.moveBackward(0.01),
+    left: () => mainCar.steerLeft(0.01),
+    right: () => mainCar.steerRight(0.01),
+    brake: () => mainCar.brake(0.01),
+  };
+
+  moveIntervals[direction] = setInterval(actions[direction], 8);
 };
 
 const stopMove = (direction) => {
@@ -51,24 +52,15 @@ const stopMove = (direction) => {
 };
 
 // Butonlara olay dinleyicileri ekleme
-controlButtons.up.addEventListener("pointerdown", () => startMove("up"));
-controlButtons.down.addEventListener("pointerdown", () => startMove("down"));
-controlButtons.left.addEventListener("pointerdown", () => startMove("left"));
-controlButtons.right.addEventListener("pointerdown", () => startMove("right"));
-controlButtons.brake.addEventListener("pointerdown", () => startMove("brake"));
+const addControlListeners = (button, direction) => {
+  button.addEventListener("pointerdown", () => startMove(direction));
+  button.addEventListener("pointerup", () => stopMove(direction));
+  button.addEventListener("pointerout", () => stopMove(direction));
+};
 
-controlButtons.up.addEventListener("pointerup", () => stopMove("up"));
-controlButtons.down.addEventListener("pointerup", () => stopMove("down"));
-controlButtons.left.addEventListener("pointerup", () => stopMove("left"));
-controlButtons.right.addEventListener("pointerup", () => stopMove("right"));
-controlButtons.brake.addEventListener("pointerup", () => stopMove("brake"));
-
-// Pointerout eklendi -> (parmak kayarsa durması için)
-controlButtons.up.addEventListener("pointerout", () => stopMove("up"));
-controlButtons.down.addEventListener("pointerout", () => stopMove("down"));
-controlButtons.left.addEventListener("pointerout", () => stopMove("left"));
-controlButtons.right.addEventListener("pointerout", () => stopMove("right"));
-controlButtons.brake.addEventListener("pointerout", () => stopMove("brake"));
+Object.entries(controlButtons).forEach(([direction, button]) => {
+  addControlListeners(button, direction);
+});
 
 //--------------------------------------------------
 
@@ -155,7 +147,7 @@ const bitmapFontText = new BitmapText({
 bitmapFontText.x = (WIDTH - fpsFontSize) / 2;
 bitmapFontText.y = 0;
 app.stage.addChild(bitmapFontText);
-bitmapFontText.zIndex=999
+bitmapFontText.zIndex = 999;
 let modelIdentifier = Math.random().toString(36).slice(2);
 let model = await fetch("https://bilis.im/yzgmodel").then(
   (r) => r.json(),
@@ -163,7 +155,7 @@ let model = await fetch("https://bilis.im/yzgmodel").then(
 );
 // FPS Hesaplama
 let secondCounter = 0;
-window.frameTimes=frameTimes
+window.frameTimes = frameTimes;
 setInterval(() => {
   let now = Date.now();
   frameTimes = frameTimes.filter((e) => now - e < 1000);
