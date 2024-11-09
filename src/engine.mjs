@@ -241,7 +241,7 @@
       let [gridX,gridY] = gridIndexes
       let gridElement = this.game.map[gridX][gridY]
       if(gridElement[0]==-1)return false
-      let res = findPath(this.game.map,getIndexes(this.posX,this.posY),gridIndexes,getMinimumDistance,forceInitialDirection)//242
+      let res = findPath(this.game.map,getIndexes(this.posX,this.posY),gridIndexes,getMinimumDistance,forceInitialDirection)
       return res
     }
     let imagePaths = {}
@@ -629,8 +629,9 @@ this.spriteWidth=this.spriteWidth??this.width
         this.posY += posChangeY
         let newIndexes = getIndexes(this.posX,this.posY)
         if(!arrayEquals(this.gridIndexes,newIndexes)){
+          let oldIndexes = this.gridIndexes
           this.gridIndexes=newIndexes
-          this.onIndexChange.forEach(fun=>fun.call(this,this.gridIndexes,newIndexes))
+          this.onIndexChange.forEach(fun=>fun.call(this,oldIndexes,newIndexes))
         }
         let absVel = this.absoluteVel();
         let absAcc = this.absoluteAcc();
@@ -702,14 +703,14 @@ this.spriteWidth=this.spriteWidth??this.width
         //T şeklindeki yolda karşılıklı olmayan yerden gelen araç için gelinen yöne izin verilmemeli
         let nextDirection = (currRoadType=="4"||currRoadType=="3"||currRoadType=="rightcurve")?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
         this.goal=[x,y]
-        let currPath = findPathTo.call(this,x,y,true,nextDirection)//694
+        let currPath = findPathTo.call(this,x,y,true,nextDirection)
         if(currPath){
           this.setPath(currPath)
         }else{
           //TODO: bu yolun rengi farklı olmalı
           currPath= findPathTo.call(this,x,y,true)
           if(currPath){
-            this.setPath(currPath)
+            this.setPath(currPath,true)
           }
         }
       }
@@ -717,8 +718,9 @@ this.spriteWidth=this.spriteWidth??this.width
         let BC = this.getLines()[1]
         return [(BC[0][0]+BC[1][0])/2,(BC[0][1]+BC[1][1])/2]
       }
-      setPath(value){
+      setPath(value,isWrongDirection=false){
         this.path=value
+        this.isWrongDirection=isWrongDirection
         let startIndex = drawPath(this.game.roads,value)
         if(startIndex===undefined)return
         let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
@@ -805,7 +807,6 @@ this.spriteWidth=this.spriteWidth??this.width
         // Hedefe doğru açıyı hesapla
         let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
         let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
-      
         // Yön ayarlaması yap
         if (angleDifference > 2) {
           this.steerRight(dt);
