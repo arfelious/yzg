@@ -163,6 +163,7 @@ let model = await fetch("https://bilis.im/yzgmodel").then(
 );
 // FPS Hesaplama
 let secondCounter = 0;
+window.frameTimes=frameTimes
 setInterval(() => {
   let now = Date.now();
   frameTimes = frameTimes.filter((e) => now - e < 1000);
