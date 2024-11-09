@@ -1,7 +1,5 @@
     /*
       TODO:
-          game.mjs dosyasında ekrandaki butonların girdi alış şekli değiştirilecek, interval kullanılmayacak
-          Game.reset() methodu yazılacak, tüm varlıklar silinecek
           geçici binanın altına koyulan yeşil renk kaldırılacak, çim veya başka bir resim ile değiştrilecek
           binaların 3d'msi görünümü düzenlenecek
           GENEL OPTİMİZASYON
@@ -45,8 +43,6 @@
     export const app = new PIXI.Application();
     export const { BitmapText } = PIXI;
     await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
-    let staticContainer = new PIXI.Container();
-    app.stage.addChild(staticContainer)
     let changeImageResolution=async (texture, options)=>{
       if(!options)return texture
       let [intendedWidth,isRotated] = options
@@ -76,7 +72,7 @@
     const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e,i)=>[e,i]))
     let imagesArray = ["temp_car.png", "bariyerr.png","ocean.jpeg","bina_test.png","bina_yan.png",...ROAD_IMAGES]
     //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
-    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH],"bina_temp.png":[ROAD_WIDTH],"bina_yan.png":[ROAD_WIDTH]}
+    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH],"bina_test.png":[ROAD_WIDTH],"bina_yan.png":[ROAD_WIDTH]}
     ROAD_IMAGES.forEach(e=>intendedWidths[e]=[ROAD_WIDTH,false])
     const ROAD_TYPES = {"straight":[0,180],"rightcurve":[90,180],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
@@ -392,6 +388,7 @@
       childContainer=new PIXI.Container()
       cachedLines
       currentGrids=new Set()
+      destroyed=false
       getGrids(){
         //Array'de olup olmadığının hızlı anlaşılması için string olarak tutulması gerekiyor
         let lines = this.getLines()
@@ -417,7 +414,7 @@
         this.customDrawers.delete(fun)
       }
       drawGraphics(clearRect) {
-        if(this.game.destroyed)return
+        if(this.destroyed)return
         if (!this.createGraphics) return
         if (clearRect) this.graphics.clear()
         if(this.drawBounds){
@@ -524,7 +521,7 @@ this.spriteWidth=this.spriteWidth??this.width
         }
       }
       set fillColor(value) {
-        if (this.graphics&&!this.graphics.destroyed) {
+        if (this.graphics&&!this.destroyed) {
           this.graphics.fill(value)
           this.shouldDraw = true
         }
@@ -567,8 +564,7 @@ this.spriteWidth=this.spriteWidth??this.width
         let found = imagePaths[currSpritePath]
         let sprite = PIXI.Sprite.from(found)
         this.init(sprite)
-        if(this.entityType=="road")staticContainer.addChild(sprite)
-        else app.stage.addChild(sprite);
+        app.stage.addChild(sprite);
         sprite.zIndex = this.zIndex
       }
       // Hız büyüklüğünü hesaplayan fonksiyon
@@ -583,18 +579,20 @@ this.spriteWidth=this.spriteWidth??this.width
         return dotProduct(toUnitVector([this.velX, this.velY]), toVector(this._direction)) || 0
       }
       tick() {
-        if(this.sprite.x!=this.posX){
-          this.sprite.x = this.posX;
-          this.childContainer.x = this.posX
-        }
-        if(this.sprite.y!=this.posY){
-          this.sprite.y = this.posY;
-          this.childContainer.y=this.posY
-        }
-        if (this.createGraphics) {
-          if(this.graphics.x!=this.posX)this.graphics.x = this.posX
-          if(this.graphics.y!=this.posY)this.graphics.y = this.posY
-          if(this.graphics.angle!=this.sprite.angle)this.graphics.angle = this.sprite.angle
+        if(!this.destroyed){
+          if(this.sprite.x!=this.posX){
+            this.sprite.x = this.posX;
+            this.childContainer.x = this.posX
+          }
+          if(this.sprite.y!=this.posY){
+            this.sprite.y = this.posY;
+            this.childContainer.y=this.posY
+          }
+          if (this.createGraphics) {
+            if(this.graphics.x!=this.posX)this.graphics.x = this.posX
+            if(this.graphics.y!=this.posY)this.graphics.y = this.posY
+            if(this.graphics.angle!=this.sprite.angle)this.graphics.angle = this.sprite.angle
+          }
         }
         this.customDrawers.forEach(fun=>fun())
         if(this.childContainer.angle!=this.direction){
@@ -609,13 +607,14 @@ this.spriteWidth=this.spriteWidth??this.width
       }
       destroy(){
         this.shouldDraw=false
+        this.destroyed=true
         entities.splice(entities.indexOf(this),1)
-        if(this.sprite)this.sprite.destroy(true)
+        if(this.sprite)this.sprite.destroy()
         if(this.childGraphics){
-          this.childGraphics.forEach(e=>e.destroy(true))
+          this.childGraphics.forEach(e=>e.destroy())
         }
         if(this.childContainer){
-          this.childContainer.children.forEach(e=>e.destroy(true))
+          this.childContainer.children.forEach(e=>e.destroy())
           this.childContainer.destroy()
         }
       }
@@ -738,11 +737,10 @@ this.spriteWidth=this.spriteWidth??this.width
         let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
         let currRoad = this.game.roads[roadIndexes[0]][roadIndexes[1]]
         let lineCoords = currRoad.getHighlightCoordinates(startIndex)
-        if(!this.customLine.destroyed&&this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
+        if(!this.destroyed&&this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
         this.lineEnd=lineCoords[0]
         this.removeDrawer(this.customLineDrawer)
         this.customLineDrawer = ()=>{
-          if(this.customLine.destroyed)return
           this.customLine.clear()
           if(!this.lineEnd){
             return this.removeGoal()
@@ -754,7 +752,7 @@ this.spriteWidth=this.spriteWidth??this.width
       }
       removeGoal(){
         this.path=null
-        if(this.customLine&&!this.customLine.destroyed)this.customLine.clear()
+        if(this.customLine&&!this.destroyed)this.customLine.clear()
         this.removeDrawer(this.customLineDrawer)
         this.goal=null
         clearPath(this.game.roads)
@@ -1001,7 +999,7 @@ this.spriteWidth=this.spriteWidth??this.width
             //TODO: işaretlerin gerekçesini bul, belki başka yerde de gerekir
             let sign = [-1,1,-1,1][angleIndex]
             let last = [centerX+sign*lineLength*Math.cos(offsetRad),centerY+sign*lineLength*Math.sin(offsetRad)]
-            let deltaDeg = 90/remaining
+            let deltaDeg = 90/(remaining-1)
             let deltaRad = toRadian(deltaDeg)
             for(let i = 1;i<remaining;i++){
               let curr = [centerX+sign*lineLength*Math.cos(offsetRad+deltaRad*i),centerY+sign*lineLength*Math.sin(offsetRad+deltaRad*i)]
@@ -1051,8 +1049,16 @@ this.spriteWidth=this.spriteWidth??this.width
       }
       destroy(){
         super.destroy()
-        this.highlightLines.forEach(e=>e&&e.destroy(true))
+        this.highlightLines.forEach(e=>e&&e.destroy())
       }
+      /*
+              this.forceSquare=true
+        this.entityType="ocean"
+        this.width=ROAD_WIDTH
+        this.sprite="ocean.jpeg"
+        this.sprite.zIndex=0
+        this.sprite.tint=0x00ffaa
+      */
       constructor(game,spritePath, directionOffset, direction) {
         super(game)
         this.anchorX=0.5
@@ -1108,8 +1114,6 @@ export class BuildingSide extends Entity{
       anchorX=0.5
       anchorY=0.5
       setPosition(x, y) {
-        //TODO: fix widths and heights, skew the images
-        //KOORDINAT KONTROLU MERKEZE DEĞİL, KENARA GÖRE OLMALI
         this.posX = x
         this.posY = y
         let ratio = 1-BUILDING_MULTIPLIER
@@ -1222,7 +1226,7 @@ export class BuildingSide extends Entity{
       }
       drawLine(isOffset,curr=this.getLines(isOffset)[0]){
         this.cachedLines=null
-        if(this.graphics.destroyed)return
+        if(this.destroyed)return
         this.graphics.clear()
         this.graphics.moveTo(curr[0][0],curr[0][1]).lineTo(curr[1][0],curr[1][1]).stroke()
       } 
@@ -1376,7 +1380,6 @@ export class BuildingSide extends Entity{
         this.globalColliders=new Set()
       }
       graphicsTick(){
-        if(this.destroyed)return
         //Happens every frame
         entities.forEach(e => e.setGraphics())
       }
@@ -1405,7 +1408,7 @@ export class BuildingSide extends Entity{
         let filled = {}
         if(maxEdge&&maxEdge.length>=2){
           maxEdge.forEach(e=>{
-            let currOcean = new Ocean(game)
+            let currOcean = new Ocean(this)
             filled[e.join(",")]=true
             let [i,j] = e
             currOcean.setPosition(ROAD_WIDTH*(i+1),ROAD_WIDTH*j)
@@ -1426,7 +1429,9 @@ export class BuildingSide extends Entity{
       }
       destroy(){
         this.destroyed=true
-        if(this.stage)this.stage.children.forEach(e=>this.stage.removeChild(e))
+        if(this.stage){
+          while(this.stage.children[0])this.stage.removeChild(stage.children[0]); 
+        }
         entities.forEach(e=>e.destroy())
       }
       constructor(stage){
