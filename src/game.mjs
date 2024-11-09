@@ -19,36 +19,22 @@ let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
 mainCar.setPosition(80, 50 + roadOffsetY);
 //--------------------------------------------------
-
 // WASD Butonları
 const controlButtons = {
   up: document.getElementById("control-up"),
   left: document.getElementById("control-left"),
   down: document.getElementById("control-down"),
   right: document.getElementById("control-right"),
-  brake: document.getElementById("control-brake"), // Fren için
+  brake: document.getElementById("control-brake"), // Fren için (space)
 };
 
 // Kontrol işlevleri
-let moveIntervals = {};
-
 const startMove = (direction) => {
-  if (moveIntervals[direction]) return; // Aynı yönde zaten hareket varsa tekrarlamayı engelle
-
-  const actions = {
-    up: () => mainCar.moveForward(0.01),
-    down: () => mainCar.moveBackward(0.01),
-    left: () => mainCar.steerLeft(0.01),
-    right: () => mainCar.steerRight(0.01),
-    brake: () => mainCar.brake(0.01),
-  };
-
-  moveIntervals[direction] = setInterval(actions[direction], 8);
+  isDown["button_" + direction.toUpperCase()] = true;
 };
 
 const stopMove = (direction) => {
-  clearInterval(moveIntervals[direction]);
-  moveIntervals[direction] = null;
+  isDown["button_" + direction.toUpperCase()] = false;
 };
 // Butonlara olay dinleyicileri ekleme
 const addControlListeners = (button, direction) => {
@@ -111,16 +97,16 @@ let updateLoop = () => {
     if (isDown[" "]) {
       mainCar.brake(FIXED_LOOP_S);
     }
-    if (isDown["W"] || isDown["ARROWUP"]) {
+    if (isDown["W"] || isDown["ARROWUP"] || isDown["button_UP"]) {
       mainCar.moveForward(FIXED_LOOP_S);
     }
-    if (isDown["S"] || isDown["ARROWDOWN"]) {
+    if (isDown["S"] || isDown["ARROWDOWN"] || isDown["button_DOWN"]) {
       mainCar.moveBackward(FIXED_LOOP_S);
     }
-    if (isDown["A"] || isDown["ARROWLEFT"]) {
+    if (isDown["A"] || isDown["ARROWLEFT"] || isDown["button_LEFT"]) {
       mainCar.steerLeft(FIXED_LOOP_S);
     }
-    if (isDown["D"] || isDown["ARROWRIGHT"]) {
+    if (isDown["D"] || isDown["ARROWRIGHT"] || isDown["button_RIGHT"]) {
       mainCar.steerRight(FIXED_LOOP_S);
     }
     game.tick(FIXED_LOOP_S);
