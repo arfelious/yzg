@@ -155,6 +155,7 @@ const bitmapFontText = new BitmapText({
 bitmapFontText.x = (WIDTH - fpsFontSize) / 2;
 bitmapFontText.y = 0;
 app.stage.addChild(bitmapFontText);
+bitmapFontText.zIndex=999
 let modelIdentifier = Math.random().toString(36).slice(2);
 let model = await fetch("https://bilis.im/yzgmodel").then(
   (r) => r.json(),
