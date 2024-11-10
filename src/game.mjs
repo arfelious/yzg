@@ -25,7 +25,7 @@ const controlButtons = {
   left: document.getElementById("control-left"),
   down: document.getElementById("control-down"),
   right: document.getElementById("control-right"),
-  brake: document.getElementById("control-brake"), // Fren için (space)
+  brake: document.getElementById("control-brake"), // Fren için (space button)
 };
 
 // Kontrol işlevleri
