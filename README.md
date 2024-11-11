@@ -25,7 +25,7 @@
 <h4>Abdurrahman Akçit ✅</h4>
 <h4>Esra Ayvaz ❌</h4>
 <h4>Ayşe Afacan ✅</h4>
-<h4>Atacan Yurdaer ❌</h4>
+<h4>Atacan Yurdaer ✅</h4>
 <h4>Yusuf Baran Korkmaz ❌</h4>
 <h4>Sibel Genç ❌</h4>
 <h4>Kaan Biber ❌</h4>
