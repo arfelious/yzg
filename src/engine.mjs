@@ -1,25 +1,34 @@
     /*
-      TODO:
-          geçici binanın altına koyulan yeşil renk kaldırılacak, çim veya başka bir resim ile değiştrilecek
-          binaların 3d'msi görünümü düzenlenecek
+    TODO:
           GENEL OPTİMİZASYON
+          a* ve ucs kontrol edilecek
+            ilk yool bloğunun sonuna gelinse de gidilememesi gereken bir yöne gidilebiliyor
+          alternatif 1'in tüm özellikleri a*'da bulunmuyor, güncellenecek
+          obstacles array değil, açıklayıcı kelimeler içeren object olmalı
+          rightcurve için engeller sınırlanmalı
+          okyanus dibindeki yollara random kum veya beton, collision gerekmeyeceği için childGraphics kullanılabilir
+          engellerin bulunabileceği yol türleri düzgün ayarlanmalı
+          kasis, çukur vs. şeride özel olmalı
+            açıları da ona göre ayarlanmalı
+          nesnelerin levhaları beraberinde eklenmeli
+          nesnelerin boyutları ve yolda hizalanmaları ayarlanmalı
+          setMapExtras kod tekrarı düşürülecek
+          kural tabanlı otonomun şerit kontrolü iyileştirilmeli
+          private olması gereken property ve method'lar private yapılacak (örn. setPosition yerine #setPosition)
+          resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
+          binaların 3d'msi görünümü düzenlenecek
           sensörlerde getGrids düzgün çalışmıyor, collision kontrolünü filtrelemek için yeterli değil
-          customCoords ile sensor line'ın mesafesi kesişim durumunda azaltılacak, bitiş koordinatı olarak customCoords verilecek
           Kod okunurluğu arttırılacak, kod tekrarı düşürülecek
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
-          tüm nesnelerin alt nesnelere dair property'si olmalı, araçlarda bu customLine'ı tutacak, yollarda highlightLines ve engelleri tutacak
           road class'ı için getLines fonksiyonundaki kod tekrarı verimlilik düşürülmeden azaltılacak
           aracın oluşturduğu çizgi hesaplanırken getFrontLine tüm çizgileri hesaplatıyor, ayrı olarak hesaplanması daha iyi olur
           kavisli yolda bakılan yön yanlış bulunabiliyor
           yol bulucunun çizdiği yolun sonuna görünürlüğü arttırmak amacıyla daire eklenecek
           optimal yolu bulması isteniyorsa findPath memoization kullanmalı
-          mobilde test için oyun kısmının dışına 4 adet buton, WASD ile yapıldığı gibi hareket edilmesini sağlayacak
           yol budama sistemi: harita şu an fazla dolu, fazla dönemeç içeren kısımlar kırpılıp kalan kısım uygun şekilde ayarlanır
           road nesnelerinin içinde şeridi temsil eden bir nesne olmalı. modelin şeridi geçmesinin ve yoldan çıkmasının ayrı değerlendirilebilmesi için gerekli
           hızı, ivmeyi ve sürtünmeyi belirleyen sabit değerler yola ve araca bağlı olmalı, şimdilik hangi tür yol olduğunu söyleyen yer tutucu fonksiyon yazabiliriz
             isUsingBrake kullanılırken TURN_DRAG değiştirilmeli
-          collidersEquals fonksiyonu yazılmalı 
-            prev array'indeki her elemanın next'te de bulunmasına bakması yeterli olur ama optimize edilebilir
           araçların iç ve dış hız değerleri farklı olmalı. araçların yönü hızına göre belirlendiği için bir araç çarparsa araç aniden yön değiştirir, önlemek içi ayrı hız değerleri kullanılıp hesaplamalarda ikisini beraber kullanacak bi hız değeri kullanılır. direction ve _direction'da olduğu gibi getter setter kullanılmalı
           trafik işaretleri, engeller ve farklı araçlar eklenmeli
           collision resolution
@@ -31,18 +40,20 @@
     export const HEIGHT = 900;
     export const CAR_WIDTH = 48;
     export const ROAD_WIDTH = 150
-    export const BARRIER_WIDTH = CAR_WIDTH/2
     export const DRAG = 4.4; // increases drag when increased
     export const TURN_DRAG = 1.2;
     export const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
-    export const STEERING_MULTIPLIER = 1.4
+    export const STEERING_MULTIPLIER = 1.6
     export const MIN_ALIGNMENT = 0.7
     export const PATH_START_INDEX = 2
     export const BUILDING_MULTIPLIER = 0.9
-    export const HIGHLIGHT_STYLE = {color:0x006699,width:4}
+    export let highlightStyle = {color:0x006699,width:4}
     export const app = new PIXI.Application();
     export const { BitmapText } = PIXI;
     await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
+    const IS_DEBUG = false //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+    const DIRECTION_ALTERNATIVE = 2 // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
+    const PERSPECTIVE = [0.5,0.5] // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
     let changeImageResolution=async (texture, options)=>{
       if(!options)return texture
       let [intendedWidth,isRotated] = options
@@ -65,26 +76,104 @@
       })
     }
     const ROAD_TYPES_ARR = ["straight","rightcurve","3","4"]
+    //ilk değer true ise yoldadır, değilse kenardadır
+    //ikinci değer hangi tür yollarda olabileceği
+    //üçüncü değer nesnenin genişliği
+    //dördüncü değer nesnenin resim ismi
+    //beşinci değer genişliğin yükseklik olarak kullanılması
+    //altıncı değer (varsa) yol üzerindeki engeller için kaç şerit kapladığı
+    const OBSTACLES = {
+      "rogar":[true,ROAD_TYPES_ARR,CAR_WIDTH*2,"rogarKapagi.png",true],
+      "cukur":[true,ROAD_TYPES_ARR,CAR_WIDTH,"cukur.png",false],
+      "bariyer":[true,ROAD_TYPES_ARR,CAR_WIDTH,"bariyer.png",true],
+      "stopLevha":[false,["3","4"],CAR_WIDTH*2/3,"lvh.png",false],
+      "kasis":[true,ROAD_TYPES_ARR,ROAD_WIDTH/2,"kasis.png",true,2],
+      "kasisLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH,"kasisLevha.png",false],
+      "yayaLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH*2/3,"lvh2.png",false],
+    }
+    const OBSTACLE_SIGNS = []
+    const OBSTACLES_WITH_SIGN = Object.fromEntries(Object.keys(OBSTACLES).filter(e=>{
+      let signKey = e+"Levha"
+      let retVal = signKey in OBSTACLES
+      if(retVal){
+        OBSTACLE_SIGNS.push(signKey)
+      }
+      return retVal
+    }).map(e=>[e,1]))
+    const OBSTACLE_IMAGES = Object.values(OBSTACLES).map(e=>e[3])
+    const OBSTACLE_IMAGE_TO_NAME = Object.fromEntries(Object.entries(OBSTACLES).map(e=>[e[1][3],e[0]]))
     // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
     const ROAD_IMAGES = ["duzyol.png", "yol1.png","yol3.png","dortyol.png"]
     const IMAGE_TO_TYPE = {"duzyol.png":"straight","yol1.png":"rightcurve","yol3.png":"3","dortyol.png":"4"}
     const TYPE_TO_IMAGE = {"straight":"duzyol.png","rightcurve":"yol1.png","3":"yol3.png","4":"dortyol.png"}
     const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e,i)=>[e,i]))
-    let imagesArray = ["temp_car.png", "bariyerr.png","ocean.jpeg","bina_test.png","bina_yan.png",...ROAD_IMAGES]
+    let imagesArray = ["temp_car.png","ocean.jpeg","bina_test.png","bina_yan.png","park alanı.jpg","cim.jpg",...ROAD_IMAGES,...OBSTACLE_IMAGES]
     //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
-    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH],"bina_test.png":[ROAD_WIDTH],"bina_yan.png":[ROAD_WIDTH]}
-    ROAD_IMAGES.forEach(e=>intendedWidths[e]=[ROAD_WIDTH,false])
+    let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH],"bina_test.png":[ROAD_WIDTH],"bina_yan.png":[ROAD_WIDTH],"park alanı.jpg":[ROAD_WIDTH],"cim.jpg":[ROAD_WIDTH]};
+    //tüm engel ve yol resimleri için resimler ölçeklenecek
+    let toScale = [...ROAD_IMAGES.map(e=>[e,false]),...OBSTACLE_IMAGES.map(e=>[e,OBSTACLE_IMAGE_TO_NAME[e][4]])]
+    toScale.forEach(e=>intendedWidths[e[0]]=[ROAD_WIDTH,e[1]||false])
     const ROAD_TYPES = {"straight":[0,180],"rightcurve":[90,180],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
     let connectionArray = ["up","right","down","left"]
     let connectionLookup = {"up":0,"right":1,"down":2,"left":3}
     const LINE_AMOUNTS = {"straight":4,"4":8,"3":5,"rightcurve":10}
+    const ROAD_WEIGHTS = {"3":0.5,"4":0.5}
     let startTime = Date.now()
+    let getRoadWeight = roadType=>{
+      return ROAD_WEIGHTS[roadType]||1
+    }
     let shiftConnections = (connections,angle)=>{
       return connections.map(e=>connectionArray[Math.floor(connectionLookup[e]+angle/90)%4])
     }
     function getConnections(roadType, angle) {
       return shiftConnections(ROAD_TYPES[roadType].map(e=>angleLookup[e]),angle)
+    }
+    //her yol 9 kısma bölünebilir, bunlardan yol olmayanlara levha, olanlara engel yerleştirilebilir
+    let getSubgridAngle = index=>{
+      //polar koordinat diye geçiyor aslında ama hem boyut bu durumda önemli değil hem de fonksiyon direkt kullanılırsa amacın anlaşılması zorlaşır
+      // 45, 135 gibi ara değerler için de çalışır ama şu an gerekmiyor
+      //TODO: neden atan2(x,y) işe yaradı? (y,x) olmalıydı
+      return toDegree(Math.atan2(index[0],index[1]))
+    }
+    let getSubgridIndex = angle=>{
+      return [Math.round(Math.sin(toRadian(angle))),Math.round(Math.cos(toRadian(angle)))]
+    }
+    let getRelativeSubgridIndex = (absIndex,offsetAngle)=>{
+      if(absIndex[0]==0&&absIndex[1]==0)return absIndex
+      let currAngle = getSubgridAngle(absIndex)
+      return getSubgridIndex(currAngle+offsetAngle)
+    }
+    let getBlockedIndexes = (connections)=>{
+      //merkez subgrid her zaman yol
+      /*
+      0: 0, 1
+      90: 1, 0
+      180: 0, -1
+      270: -1, 0
+      olmalı
+      sağdaki cos, soldaki sin
+      */
+      return [[0,0],...connections.map(e=>getSubgridIndex(e))]
+    }
+    let getPossibleSubgrids = (roadType,angle,isOnRoad)=>{
+      let currConnections = getConnections(roadType,angle).map(e=>connectionLookup[e]*90)
+      let currBlocked = getBlockedIndexes(currConnections)
+      let retVal = []
+      for(let i = -1;i<2;i++){
+        for(let j = -1;j<2;j++){
+          let curr = [i,j]
+          if(arrayEquals(curr,[0,0]))continue
+          // yoldaysa engellenenleri, değilse engellenmeyenleri almalı
+          // engellenmedi XOR isOnRoad ya da engellendi==isOnRoad
+          // yapılabilir
+          let found = !!currBlocked.find(e=>arrayEquals(curr,e))
+          if(found==isOnRoad){
+            retVal.push(curr)
+          }
+        }
+      }
+      return retVal
     }
     let getOpposite=(direction)=>{
       return connectionArray[(connectionLookup[direction]+2)%4]
@@ -103,7 +192,8 @@
       ROAD_TYPES_ARR.forEach(e=>weightObj[e]=Math.random())
       grid.forEach(col=>col.forEach(e=>{
         if(e[0]==-1)return
-        weightObj[ROAD_TYPES_ARR[e[0]]]+=Math.random()*(ROAD_TYPES_ARR[e[0]]=="4"||ROAD_TYPES_ARR[e[0]]=="3"?2:1)
+        // 4 ve 3 tipi yolların gelme ihtimali düşürülüyor, harita daha az dolu oluyor
+        weightObj[ROAD_TYPES_ARR[e[0]]]+=Math.random()*(1/getRoadWeight(ROAD_TYPES_ARR[e[0]]))
       }))
       return weightObj
     }
@@ -121,7 +211,7 @@
     let createMap = (grid,curr,fromDirection)=>{
       let firstInsert = !grid
       if(firstInsert){
-        //TODO: memoization eklendiğinde burada eski veriler silinmeli
+        //TODO: memoization eklendiğinde bu kısımda eski veriler silinmeli
         grid=Array(GRID_WIDTH).fill().map(e=>Array(GRID_HEIGHT).fill([-1,-1]))
         let initialY = Math.floor(Math.random()*GRID_HEIGHT)
         curr=[0,initialY]
@@ -178,66 +268,337 @@
       }
       return false
     }
+    //WIP: henüz kullanılmamalı
+    let findSuitableRoad = (point,connections,grid)=>{
+      let curveIndex = ROAD_TYPES_OBJ["rightcurve"]
+      let threeIndex = ROAD_TYPES_OBJ["3"]
+      let fourIndex = ROAD_TYPES_OBJ["4"]
+      let straightIndex = ROAD_TYPES_OBJ["straight"]
+      console.log("test",point,connections)
+      let directions = connections.map(e=>getRelativeDirection(point,e))
+      console.log("dire",point,directions.length)
+      if(connections.length==4){
+        return [fourIndex,[0,90,180,270][Math.floor(Math.random()*4)]]
+      }
+      if(connections.length==3){
+        /*
+        up 180
+        right 270
+        down 0
+        left 90
+        */
+        //let foundAngle = !directions.include("down")?0:!directions.include("up")?180:!directions.include("right")?270:90
+        let foundAngle
+        for(let i = 0;i<4;i++){
+          let e = connectionArray[i]
+          if(!directions.includes(e)){
+            foundAngle=((i/* +n?  */)*90)%360
+            break
+          }
+        }
+        return [threeIndex,foundAngle]
+      }
+      if(connections.length==2){
+        let indexLeft = connectionLookup[directions[0]]
+        let indexRight = connectionLookup[directions[1]]
+        let difference = connectionArray[(indexLeft+3)%4]==directions[1]||connectionArray[(indexRight+3)%4]==directions[0]?1:2
+        console.log("diff is",difference)
+        if(difference==1){
+          let firstDirectionIndex = connectionLookup[directions[0]]
+          let foundAngle = [0,90,180,270][firstDirectionIndex]
+          return [curveIndex,foundAngle]
+        }else{
+          let foundAngles = directions[0]=="up"?[90,270]:[0,180]
+          let index = Math.round(Math.random())
+          return [straightIndex,foundAngles[index]]
+        }
+      }
+      return grid[point[0]][point[1]]
+
+    }
+    //WIP: henüz kullanılmamalı
+    let fixRoad = (points,grid)=>{
+      let changes = Array(grid.length).fill().map(e=>[])
+      points.forEach(connectionGroup=>{      
+        connectionGroup.forEach(currPoint=>{
+        let [direction,point] = currPoint
+        let [i,j]=point
+        let e = grid[i][j]
+        if(!inBounds(point)||e[0]==-1)return
+        let currNeighbours = getNeighbours(point)
+        let newConnections = getConnections(ROAD_TYPES_ARR[e[0]],e[1]).map(e=>currNeighbours[connectionLookup[e]])
+        .filter(e=>{
+          let currDirection = getRelativeDirection(point,e)
+          let toBeDeleted = currDirection==direction
+         return (!inBounds(e)||grid[e[0]][e[1]][0]!=-1)&&!toBeDeleted
+        })
+        changes[i][j]=findSuitableRoad(point,newConnections,grid)
+      })
+    })
+      return changes
+    }
+    let changeGrid = (changes,grid)=>{
+      changes.forEach((e,i)=>e.forEach((e,j)=>grid[i][j]=e))
+      resetChanges(changes)
+      return grid
+    }
+    let resetChanges = changes=>{
+      changes.forEach((e,i)=>{
+        if(e.length)changes[i]=[]
+      })
+    }
+    //WIP: henüz kullanılmamalı, muhtemelen tamamen değiştirilecek
+    let pruneRoads = grid=>{
+      return grid
+      //Aşama 1: birbirine bağlı olan ve diğer bağlı oldukları yer de birbirine bağlanan dönemeçler siliniyor. bunların yolların ulaşılabilirliğine bir etkisi yok
+      let curveIndex = ROAD_TYPES_OBJ["rightcurve"]
+      let threeIndex = ROAD_TYPES_OBJ["3"]
+      let fourIndex = ROAD_TYPES_OBJ["4"]
+      let changes = Array(grid.length).fill().map(e=>[])
+      grid.forEach((e,i)=>e.forEach((e,j)=>{
+        if(e[0]!=curveIndex)return
+        let point = [i,j]
+        let currNeighbours = getNeighbours(point)
+
+        let currentConnections = getConnections("rightcurve",e[1]).map(e=>[e,currNeighbours[connectionLookup[e]]])
+        let found = currentConnections.find(e=>inBounds(e[1])&&grid[e[1][0]][e[1][1]][0]==curveIndex)
+        let otherDirection = found&&currentConnections.find(e=>e[1]!=found[1])[0]
+        let notCompatible = found&&currentConnections.find(e=>(found[1]!=e[1])&&inBounds(e[1])&&grid[e[1][0]][e[1][1]][0]!=threeIndex&&grid[e[1][0]][e[1][1]][0]!=fourIndex)
+        if(found&&!notCompatible){
+        console.log("2")
+
+          //TODO
+          changes[i][j]=[-1,-1]
+          let angle = grid[found[1][0]][found[1][1]][1]
+          changes[found[1][0]][found[1][1]]=[-1,-1]
+          let foundNeighbours = getNeighbours(found[1])
+          let foundConnections = getConnections("rightcurve",angle).map(e=>[e,foundNeighbours[connectionLookup[e]]])
+          let foundNotCompatible = foundConnections
+          .find(e=>{
+            let currPoint = e[1]
+            if(!inBounds(e[1]))return
+            let gridElement = grid[currPoint[0]][currPoint[1]]
+            let isDifferent = currPoint[0]!=point[0]||currPoint[1]!=point[1]
+            let isInvalidType = gridElement[0]!=threeIndex&&gridElement[0]!=fourIndex
+            let isDifferentDirection = (otherDirection&&e[0]!=otherDirection)
+            return isDifferent&&isInvalidType&&isDifferentDirection
+          })
+          if(foundNotCompatible){
+            delete changes[found[1][0]][found[1][1]]
+        console.log("3")
+
+            return
+          }
+        console.log("4")
+
+          grid=changeGrid(changes,grid)
+          changes = fixRoad([currentConnections.filter(e=>e!=found),foundConnections.filter(e=>inBounds(e[1])&&(e[1][0]!=i||e[1][1]!=j))].filter(e=>e),grid)
+          grid=changeGrid(changes,grid)
+        }
+      }))
+      //TODO: Aşama 2: harita dışına çıkan yollar, kendilerine bağlanan şeylerin de düzenlenmesiyle birlikte siliniyor.
+      //TODO: Aşama 3: rastgele bir yol bloğu, sebep olacağı bağlantı kopmasına rağmen yol bulunabilirliğine bakılarak siliniyor.
+      return grid
+    }
     let copyVisitedObj = x=>{
       let res = {}
       for(let e in x){
         res[e]={}
         for(let i in x[e]){
-          res[e][i]=1
+          res[e][i]=x[e][i].slice(0)
         }
       }
       return res
     }
-    let findPath = (grid,road1Indexes,road2Indexes,getMinimumDistance=false,forceInitialDirection,visited,visitedObj)=>{
-      let isInitial=!visited
-      if(isInitial){
-        visited=[]
-        visitedObj={}
-      }
-      visited.push(road1Indexes)
-      let [currX,currY]=road1Indexes
-      if(!visitedObj[currX])visitedObj[currX]={}
-      if(visitedObj[currX][currY])return false
-      else visitedObj[currX][currY]=1
-      if(currX<0||currX>=GRID_WIDTH||currY<0||currY>=GRID_HEIGHT)return false
-      if(currX==road2Indexes[0]&&currY==road2Indexes[1]){
-        return visited
-      }
-      let left = grid[road1Indexes[0]][road1Indexes[1]]
-      if(left[0]==-1)return false
-      let leftNeighbours=getNeighbours(road1Indexes)
-      let leftConnections = getConnections(ROAD_TYPES_ARR[left[0]],left[1]).map(e=>leftNeighbours[connectionLookup[e]])
-      let forcedIsArray = Array.isArray(forceInitialDirection)
-      let forcedDirection = forceInitialDirection?forcedIsArray?forceInitialDirection.map(e=>leftConnections[connectionLookup[e]]):leftNeighbours[connectionLookup[forceInitialDirection]]:null
-      if(isInitial&&forceInitialDirection){
-        if(forcedIsArray){
-          leftConnections=leftConnections.filter(e=>forcedDirection.includes(e))
-        }else if(leftConnections.includes(forcedDirection)){
-          leftConnections=[forcedDirection]
-        }
-      }
-      let currMinimumLength=Infinity
-      let res=false
-      for(let i = 0;i<leftConnections.length;i++){
-        let curr = leftConnections[i]
-        let tempRes = findPath(grid,curr,road2Indexes,getMinimumDistance,null,visited.map(e=>e),copyVisitedObj(visitedObj))
-        if(tempRes){
-          if(!getMinimumDistance)return tempRes
-          let tempLength = tempRes.length
-          if(tempLength<currMinimumLength){
-            currMinimumLength=tempLength
-            res=tempRes
+    let manhattanHeuristic = (start, end) => {
+      return Math.abs(start[0] - end[0]) + Math.abs(start[1]-end[1]);
+    };
+    let findPath = (grid,pathAlgorithm,road1Indexes,road2Indexes,getMinimumDistance=false,forceInitialDirection,visited,visitedObj,lastDirection=forceInitialDirection)=>{
+      switch(pathAlgorithm){
+        case "A*":{
+          const openSet = [[0, road1Indexes, [road1Indexes], forceInitialDirection]];
+          const gScore = {};
+          gScore[road1Indexes.toString()] = 0;
+          const costs = getWeights(grid);
+          let isInitial = true;
+          while (openSet.length > 0) {
+              openSet.sort((a, b) => a[0] - b[0]);
+              let [_, [currX, currY], path, currDirection] = openSet.shift();
+              if (currX === road2Indexes[0] && currY === road2Indexes[1]) return path;
+              let current = grid[currX][currY];
+              if (current[0] === -1) continue;
+              let neighbours = getNeighbours([currX, currY]);
+              let connections = getConnections(ROAD_TYPES_ARR[current[0]], current[1]).map(e => neighbours[connectionLookup[e]]);
+              // Apply forced direction constraint on the initial node
+              if (isInitial && forceInitialDirection) {
+                  let forcedDirection = neighbours[connectionLookup[forceInitialDirection]];
+                  if(DIRECTION_ALTERNATIVE==1){
+                    if (connections.includes(forcedDirection)) {
+                      connections = [forcedDirection];
+                    }
+                  }else{
+                    connections=connections.filter(e=>e!=forcedDirection)
+                  }
+                  isInitial = false;
+              } else {
+                  connections = connections.filter(conn => {
+                      let nextDirection = getRelativeDirection([currX, currY], conn);
+                      return nextDirection !== getOpposite(currDirection);
+                  });
+              }
+  
+              for (let next of connections) {
+                  if (!inBounds(next)) continue;
+                  let [nextX, nextY] = next;
+                  let roadType = grid[nextX][nextY][0];
+                  if (roadType === -1) continue;
+                  let baseCost = costs[ROAD_TYPES_ARR[roadType]];
+                  let tentative_gScore = gScore[[currX, currY].toString()] + baseCost;
+                  if (tentative_gScore < (gScore[next.toString()] || Infinity)) {
+                      gScore[next.toString()] = tentative_gScore;
+                      let fScore = tentative_gScore + manhattanHeuristic([nextX, nextY], road2Indexes);
+                      openSet.push([fScore, next, [...path, next], getRelativeDirection([currX, currY], next)]);
+                  }
+              }
           }
+          return false;
         }
-      }
-      return res
+        case "ucs":{
+          const queue = [[0, road1Indexes, [road1Indexes], forceInitialDirection]];
+          const costMap = {};
+          const costs = getWeights(grid);  //
+          const straightLineCostFactor = 0.5; // Düz yolların maliyetini azaltmak için
+          costMap[road1Indexes.toString()] = 0;
+          let isInitial = true;
+
+          while (queue.length > 0) {
+            queue.sort((a, b) => a[0] - b[0]); // Cost a göre sırala
+            let [cost, [currX, currY], path, currDirection] = queue.shift();
+          
+            if (currX === road2Indexes[0] && currY === road2Indexes[1]) {
+              return path;
+            }
+          
+            let left = grid[currX][currY];
+            if (left[0] === -1) continue; 
+          
+            let leftNeighbours = getNeighbours([currX, currY]);
+            let leftConnections = getConnections(ROAD_TYPES_ARR[left[0]], left[1]).map(e => leftNeighbours[connectionLookup[e]]);
+            if (isInitial && forceInitialDirection) {
+                let forcedDirection = leftNeighbours[connectionLookup[forceInitialDirection]];
+                if(DIRECTION_ALTERNATIVE==1){
+                  if(leftConnections.includes(forcedDirection)){
+                      leftConnections=[forcedDirection]
+                  }
+                }else if(DIRECTION_ALTERNATIVE==2){
+                  leftConnections=leftConnections.filter(e=>e!=forcedDirection)
+                }
+              isInitial = false;
+            } else {
+              leftConnections = leftConnections.filter(conn => {
+                let nextDirection = getRelativeDirection([currX, currY], conn);
+                return nextDirection !== getOpposite(currDirection);
+              });
+            }
+            for (let next of leftConnections) {
+              if (!inBounds(next)) continue;
+              let [nextX, nextY] = next;
+              let roadType = grid[nextX][nextY][0];
+              let baseCost = roadType !== -1 ? costs[ROAD_TYPES_ARR[roadType]] : Infinity;
+            
+              let nextDirection = getRelativeDirection([currX, currY], next);
+              let newCost = cost + (nextDirection === currDirection ? baseCost * straightLineCostFactor : baseCost);
+            
+              if (newCost < (costMap[next.toString()] || Infinity)) {
+                costMap[next.toString()] = newCost;
+                queue.push([newCost, next, [...path, next], nextDirection]);
+              }
+            }
+          }
+          return false; 
+        }
+        case "dfs":
+        default:{
+          let isInitial=!visited
+          if(isInitial){
+            visited=[]
+            visitedObj={}
+          }
+          visited.push(road1Indexes)
+          let [currX,currY]=road1Indexes
+          let isAtInitial = currX==visited[0][0]&&currY==visited[0][1]
+          if(currX<0||currX>=GRID_WIDTH||currY<0||currY>=GRID_HEIGHT)return false
+          if(!visitedObj[currX])visitedObj[currX]={}
+          if(currX==road2Indexes[0]&&currY==road2Indexes[1]){
+            return visited
+          }
+          let visitedArr = visitedObj[currX][currY]
+          let opposite = getOpposite(lastDirection)
+          if(visitedObj[currX][currY]){
+            if(!isAtInitial){
+            /* 
+            Alternatif 1:
+              dört yol gibi yollarda yolun farklı kısımlarından gelinebileceği ve bunun 
+              şu an bulunan yerden geçmeyi gerektirebileceği için ilk gidilen yerden tekrar gidilebiliyor 
+              ancak path'te geçildiği gösteriliyor
+            Alternatif 2: 
+              aracın gidebileceği değil, gidemeyeceği yön kısıtlanır ve ilk yola dair bir istisna olmaz
+            
+            ikisi beraber yapılmaya çalışırsa araç gidememesi gereken yerlerden gidebilir, yalnızca ilki yapılırsa yolu gerekirsiz uzatabilir veya gidebileceği yere gidemeyebilir, yalnızca ikincisi yapılırsa dörtyolda dönebileceği en geç noktadan daha geç olmasına rağmen dönmesi gerekecek şekilde rota ayarlanır
+            Düşük ihtimal alternatif 3:
+              her yol en az 2 parçaya ayrılır, gelinen ve içinde bulunulan yöne ait olmayan ihtimaller silinir
+            
+            */
+           if(DIRECTION_ALTERNATIVE==1)return
+          }
+          if(DIRECTION_ALTERNATIVE==2)return
+          //Belki bir önceki yolun izin vermesi durumunda ters yönden gelmeye izin verilebilir
+            if(visitedArr.includes(lastDirection)||visitedArr.includes(opposite))return false
+          }else visitedObj[currX][currY]=[]
+          visitedObj[currX][currY].push(lastDirection)
+          let left = grid[road1Indexes[0]][road1Indexes[1]]
+          if(left[0]==-1)return false
+          let leftNeighbours=getNeighbours(road1Indexes)
+          let directionsAndConnections = getConnections(ROAD_TYPES_ARR[left[0]],left[1]).map(e=>[e,leftNeighbours[connectionLookup[e]]])
+          let leftConnections = directionsAndConnections.map(e=>e[1])
+          let forcedIsArray = Array.isArray(forceInitialDirection)
+          let forcedDirection = forceInitialDirection?forcedIsArray?forceInitialDirection.map(e=>leftConnections[connectionLookup[e]]):leftNeighbours[connectionLookup[forceInitialDirection]]:null
+          if(isInitial&&forceInitialDirection){
+            if(DIRECTION_ALTERNATIVE==1){
+              if(leftConnections.includes(forcedDirection)){
+                  leftConnections=[forcedDirection]
+              }
+            }else if(DIRECTION_ALTERNATIVE==2){
+              leftConnections=leftConnections.filter(e=>e!=forcedDirection)
+            }
+          }
+          let currMinimumLength=Infinity
+          let res=false
+          for(let i = 0;i<leftConnections.length;i++){
+            let curr = leftConnections[i]
+            let direction = directionsAndConnections[i][0]
+            let tempRes = findPath(grid,null,curr,road2Indexes,getMinimumDistance,null,visited.map(e=>e),copyVisitedObj(visitedObj),direction)
+            if(tempRes){
+              if(!getMinimumDistance)return tempRes
+              let tempLength = tempRes.length
+              if(tempLength<currMinimumLength){
+                currMinimumLength=tempLength
+                res=tempRes
+              }
+            }
+          }
+          return res
+    }
+  }
     }
     let findPathTo = function(x,y,getMinimumDistance,forceInitialDirection){
       let gridIndexes = getIndexes(x,y)
       let [gridX,gridY] = gridIndexes
       let gridElement = this.game.map[gridX][gridY]
+      let currIndexes=getIndexes(this.posX,this.posY)
       if(gridElement[0]==-1)return false
-      let res = findPath(this.game.map,getIndexes(this.posX,this.posY),gridIndexes,getMinimumDistance,forceInitialDirection)
+      if(gridX==currIndexes[0]&&gridY==currIndexes[1])return false
+      let res = findPath(this.game.map,this.pathAlgorithm,currIndexes,gridIndexes,getMinimumDistance,forceInitialDirection)
       return res
     }
     let imagePaths = {}
@@ -287,6 +648,18 @@
     let isOnLineSegment = (P, Q, R) => {
       return (Q[0] < Math.max(P[0], R[0]) && Q[0] > Math.min(P[0], R[0]) &&
         Q[1] < Math.max(P[1], R[1]) && Q[1] > Math.min(P[1], R[1]));
+    }
+    let getLaneCoordinates = (direction,coords,laneMultiplier,roadDivider=8)=>{ //laneMultiplier 1 ise sağ, -1 ise sol
+      let index = connectionLookup[direction]
+      const LINE_OFFSET = roadDivider>0?ROAD_WIDTH/roadDivider:0
+      let offsetArr = [[-LINE_OFFSET,0],[0,-LINE_OFFSET],[LINE_OFFSET,0],[0,LINE_OFFSET]]
+      let [xOffset,yOffset]=offsetArr[index]
+      //if(xOffset!=0&&laneMultiplier==1)xOffset-=widthOffset
+      //if(yOffset!=0&&laneMultiplier==-1)yOffset-=widthOffset
+
+      let targetX = coords[0] * ROAD_WIDTH + ROAD_WIDTH / 2+xOffset*laneMultiplier;
+      let targetY = coords[1] * ROAD_WIDTH + ROAD_WIDTH / 2+yOffset*laneMultiplier;
+      return [targetX,targetY]
     }
     //bunun türetilişine bakılacak
     let getIntersectionPoint = (line1,line2)=>{
@@ -346,9 +719,12 @@
       for(let i =0;i<len1;i++)if(arr1[i]!=arr2[i])return false
       return true
     }
-    let collidersEquals = (prev, next) => {
-      //TODO
-      return false
+    let getSprite = currSpritePath=>{
+      let found = imagePaths[currSpritePath]
+      return PIXI.Sprite.from(found)
+    }
+    let getNormalizedAngle = angle=>{
+      return (angle%360+360)%360
     }
     class Entity {
       game;
@@ -357,7 +733,7 @@
       shouldDraw;
       tickCounter=0;
       actionInterval=5 //kaç tick'te bir eylem alınacağı
-      isAutonomous=true
+      isWrongDirection=false
       collisionLineAmount=4
       zIndex = 2
       accX = 0;
@@ -389,6 +765,7 @@
       cachedLines
       currentGrids=new Set()
       destroyed=false
+      redrawNecessary=true
       getGrids(){
         //Array'de olup olmadığının hızlı anlaşılması için string olarak tutulması gerekiyor
         let lines = this.getLines()
@@ -421,7 +798,7 @@
           this.graphics.rect(...this.boundingRect)
           this.graphics.fill(this.fillColor)
         }
-        if (this.drawCollision) {
+        if (this.drawCollision&&(!this.isImmovable||this.redrawNecessary)) {
           let lines = this.getLines()
           this.lines.forEach((e, i) => {
             let line = lines[i]
@@ -430,10 +807,11 @@
             e.moveTo(line[0][0], line[0][1])
               .lineTo(line[1][0], line[1][1]).stroke();
           })
+          this.redrawNecessary=false
         }
       }
       getNormalizedAngle(angle=this.direction){
-        return (angle%360+360)%360
+        return getNormalizedAngle(angle)
       }
       getAngleIndex(angle=this.getNormalizedAngle()){
         return Math.round(angle/90)%4
@@ -458,14 +836,14 @@
       init(sprite) {
         this.bounds = getBounds(sprite)
         let wh = sprite.getSize();
-this.spriteWidth=this.spriteWidth??this.width
+        this.spriteWidth=this.spriteWidth??this.width
         this.ratio = wh.height / wh.width;
         this.scale = this.spriteWidth / wh.width
         this.height = this.forceSquare ? this.spriteWidth : this.spriteWidth * this.ratio
         sprite.setSize(this.spriteWidth, this.height);
         sprite.anchor.set(this.anchorX, this.anchorY);
         this._sprite = sprite;
-        this.scaledBounds = [this.bounds[0][0], this.bounds[0][1], this.bounds[3][0] - this.bounds[0][0], this.bounds[3][1] - this.bounds[0][1]].map(e => e * this.scale)
+        this.scaledBounds = [this.bounds[0][0], this.bounds[0][1], this.bounds[3][0] - this.bounds[0][0]+1, this.bounds[3][1] - this.bounds[0][1]+1].map(e => e * this.scale)
         app.stage.addChild(this.childContainer)
         if (this.createGraphics) {
           this.graphics = new PIXI.Graphics();
@@ -534,7 +912,10 @@ this.spriteWidth=this.spriteWidth??this.width
         return this._direction + this.directionOffset; //in order to use rotated sprites
       }
       set direction(val) {
-        return (this._direction = val - this.directionOffset);
+        return this.setDirection(val)
+      }
+      setDirection(val){
+        this._direction=(this._direction = val - this.directionOffset);
       }
       setPosition(x, y) {
         this.posX = x
@@ -542,6 +923,7 @@ this.spriteWidth=this.spriteWidth??this.width
         this.gridIndexes=getIndexes(x,y)
         this.cachedLines=null
         this.currentGrids=this.getGrids()
+        this.redrawNecessary=true
       }
       get position() {
         return [this.posX, this.posY]
@@ -561,8 +943,7 @@ this.spriteWidth=this.spriteWidth??this.width
           this.inScene = true;
         }
         this.spriteName=currSpritePath
-        let found = imagePaths[currSpritePath]
-        let sprite = PIXI.Sprite.from(found)
+        let sprite = getSprite(currSpritePath)
         this.init(sprite)
         app.stage.addChild(sprite);
         sprite.zIndex = this.zIndex
@@ -626,6 +1007,7 @@ this.spriteWidth=this.spriteWidth??this.width
     export class MovableEntity extends Entity{
       isCollisionEffected=true
       isImmovable=false
+      isAutonomous=false
       tick(dt) {
         this.velX += this.accX * dt;
         this.velY += this.accY * dt;
@@ -689,6 +1071,7 @@ this.spriteWidth=this.spriteWidth??this.width
     export class Car extends MovableEntity {
       isMain=false
       isUsingBrake = false
+      isAutonomous=true
       anchorX = 0.3
       anchorY = 0.5
       _fillColor = 0xff9900
@@ -699,6 +1082,11 @@ this.spriteWidth=this.spriteWidth??this.width
       customLineDrawer
       goal;
       sensors=[]
+      pathAlgorithm="dfs"
+      laneMultiplier=1
+      switchLane(){
+        this.laneMultiplier*=-1
+      }
       addSensor(degree,lengthMultiplier=1,xOffset=0){
         let sensor = new Sensor(this.game,degree,this,lengthMultiplier*CAR_WIDTH,xOffset)
         this.childContainer.addChild(sensor.graphics)
@@ -713,17 +1101,19 @@ this.spriteWidth=this.spriteWidth??this.width
         //TODO: fix this
         //T şeklindeki yolda karşılıklı olmayan yerden gelen araç için gelinen yöne izin verilmemeli
         let nextDirection = (currRoadType=="4"||currRoadType=="3"||currRoadType=="rightcurve")?getNextDirection(currRoadType,currRoad.direction,fromDirection):currentDirection
-        this.goal=[x,y]
-        let currPath = findPathTo.call(this,x,y,true,nextDirection)
+        let forcedDirection = DIRECTION_ALTERNATIVE==1?nextDirection:fromDirection
+        let currPath = findPathTo.call(this,x,y,true,forcedDirection)
         if(currPath){
           this.setPath(currPath)
         }else{
+          if(!IS_DEBUG)return
           //TODO: bu yolun rengi farklı olmalı
           currPath= findPathTo.call(this,x,y,true)
           if(currPath){
             this.setPath(currPath,true)
           }
         }
+        if(currPath)this.goal=[x,y]
       }
       getFrontPoint(){
         let BC = this.getLines()[1]
@@ -737,7 +1127,7 @@ this.spriteWidth=this.spriteWidth??this.width
         let roadIndexes = this.path.length<3?this.path[this.path.length-1]:this.path[1]
         let currRoad = this.game.roads[roadIndexes[0]][roadIndexes[1]]
         let lineCoords = currRoad.getHighlightCoordinates(startIndex)
-        if(!this.destroyed&&this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(HIGHLIGHT_STYLE)
+        if(!this.destroyed&&this.customLine.strokeStyle.width==1)this.customLine.setStrokeStyle(highlightStyle)
         this.lineEnd=lineCoords[0]
         this.removeDrawer(this.customLineDrawer)
         this.customLineDrawer = ()=>{
@@ -803,16 +1193,9 @@ this.spriteWidth=this.spriteWidth??this.width
       _getGoalAction(dt) {
         if (!this.path||this.path.length==0)return
         let currGoal = this.path[1] || this.path[0]
-        let [targetGridX, targetGridY] = currGoal;
         //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
         let relativeDirection = getRelativeDirection(this.path.length>1?this.path[0]:this.gridIndexes,currGoal)
-        let direction = relativeDirection
-        let index = connectionLookup[direction]
-        const LINE_OFFSET = ROAD_WIDTH/6
-        let offsetArr = [[-LINE_OFFSET,0],[0,-LINE_OFFSET],[LINE_OFFSET,0],[0,LINE_OFFSET]]
-        let [xOffset,yOffset]=offsetArr[index]
-        let targetX = targetGridX * ROAD_WIDTH + ROAD_WIDTH / 2+xOffset; // Mutlak X koordinatı
-        let targetY = targetGridY * ROAD_WIDTH + ROAD_WIDTH / 2+yOffset; // Mutlak Y koordinatı
+        let [targetX,targetY] = getLaneCoordinates(relativeDirection,currGoal,this.laneMultiplier)
         let dx = targetX - this.posX;
         let dy = targetY - this.posY;
         // Hedefe doğru açıyı hesapla
@@ -903,7 +1286,6 @@ this.spriteWidth=this.spriteWidth??this.width
           this.addSensor(this.directionOffset+90+i*10,0.7,i*10)
           this.addSensor(this.directionOffset-90-i*10,0.7,i*10)
         }
-
         cars.push(this);
       }
     }
@@ -915,6 +1297,18 @@ this.spriteWidth=this.spriteWidth??this.width
       }
     }
     export class Road extends Entity {
+      obstacles=[]
+      #alignObstacles(){
+        return this.obstacles.forEach(e=>e.setRelativePosition())
+      }
+      setDirection(val){
+        super.setDirection(val)
+        this.#alignObstacles()
+      }
+      setPosition(x,y){
+        super.setPosition(x,y)
+        this.#alignObstacles()
+      }
       getGrids(){
         let indexes = new Set()
         let curr = this.gridIndexes.join(",")
@@ -923,13 +1317,13 @@ this.spriteWidth=this.spriteWidth??this.width
       }
       getLines(){
         if(this.cachedLines)return this.cachedLines
-        const GREEN = 47
-        const ROAD = 49
+        const GREEN = 50
+        const ROAD = 50
         const RATIO = GREEN/(GREEN+ROAD)/2
         let res = super.getLines()
         let mapped = res.map((e,i)=>e.map((e,j)=>e.map((e,q)=>e*(1-RATIO)+res[(i+2)%4][+!j][q]*RATIO)))
         let retVal=[]
-        let length = getMagnitude(res[0][0][0]-res[0][1][0],res[0][0][1]-res[0][1][1])
+        let length = this.width||getMagnitude(res[0][0][0]-res[0][1][0],res[0][0][1]-res[0][1][1])
         let lineLength = length*RATIO
         switch(this.roadType){
           case "straight":{
@@ -1039,7 +1433,7 @@ this.spriteWidth=this.spriteWidth??this.width
         if(value){
           let curr=this.highlightLines[index]
           if(curr.destroyed)return
-          curr.setStrokeStyle(HIGHLIGHT_STYLE)
+          curr.setStrokeStyle(highlightStyle)
           curr.zIndex=this.zIndex+1
           this.highlightContainer.addChild(curr)
           this.drawHighlight(index)
@@ -1051,22 +1445,14 @@ this.spriteWidth=this.spriteWidth??this.width
         super.destroy()
         this.highlightLines.forEach(e=>e&&e.destroy())
       }
-      /*
-              this.forceSquare=true
-        this.entityType="ocean"
-        this.width=ROAD_WIDTH
-        this.sprite="ocean.jpeg"
-        this.sprite.zIndex=0
-        this.sprite.tint=0x00ffaa
-      */
       constructor(game,spritePath, directionOffset, direction) {
         super(game)
         this.anchorX=0.5
         this.anchorY=0.5
         this.entityType="road"
         this.zIndex = 0
+        this.drawCollision=IS_DEBUG
         this.createGraphics=true
-        this.drawCollision=true
         this.forceSquare = true
         this.width = ROAD_WIDTH
         this.directionOffset = directionOffset
@@ -1079,14 +1465,67 @@ this.spriteWidth=this.spriteWidth??this.width
         this.highlightLines=Array(this.roadAmount).fill()
       }
     }
-    export class Barrier extends MovableEntity{
-      constructor(game,directionOffset=90,direction=0){
+    export class Obstacle extends MovableEntity{
+      parent;
+      isOnRoad;
+      possibleRoads;
+      subgridIndexes;
+      anchorX=0.5
+      anchorY=0.5
+      chosenLane //1 ise sağ şerit, -1 ise sol şerit. çift şerit genişliğindeyse de -1 çünkü çizimin başladığı şerit sol 
+      //çarpılabilir olarak ayarlanan nesnelerin konumu göreli olmaması gerektiği için childContainer kullanılamaz
+      usedLanes=1
+      setRelativePosition(){
+        let indexes = getRelativeSubgridIndex(this.subgridIndexes,this.parent._direction)
+        let multiplier = ROAD_WIDTH/2-this.width/2
+        let [relX,relY] = indexes.map(e=>e*multiplier)
+        let resX,resY
+        if(this.isOnRoad){
+          let parentGrid = getIndexes(this.parent.posX,this.parent.posY)
+          let divider = this.usedLanes==2?0:12
+          let currentAngle = getNormalizedAngle(getSubgridAngle(indexes));
+          [resX,resY] = getLaneCoordinates(angleLookup[currentAngle],parentGrid,this.chosenLane,divider)
+          resX+=relX
+          resY-=relY
+          console.log("ress",resX,resY,this.parent.posX,this.parent.posY,indexes,relX,relY)
+          this._direction=currentAngle
+        }else{
+          [resX,resY]=[this.parent.posX+relX,this.parent.posY-relY]
+        }
+        this.setPosition(resX,resY)
+      }
+      setRoad(gridX,gridY){
+        let currRoad = this.game.roads[gridX][gridY]
+        this.parent=currRoad
+        //subgrid indexler kaydedilirken direction 0'mış gibi hesaplanır, çizilirken gerçek değer okunur
+        //bu şekilde nesne döndürülünce eski değer ve yeni değerin bilinmesi gerekmeyecek
+        let possibleSubGridIndexes = getPossibleSubgrids(currRoad.roadType,0,this.isOnRoad).filter(e=>{
+          return !currRoad.obstacles.find(([_,obsIndexes])=>arrayEquals(e,obsIndexes))
+        })
+        if(!possibleSubGridIndexes.length)return false
+        let currIndexes=possibleSubGridIndexes[Math.floor(Math.random()*possibleSubGridIndexes.length)]
+        if(this.isOnRoad){
+          this.chosenLane=this.usedLanes==2?-1:Math.round(Math.random())+1
+        }
+        this.subgridIndexes=currIndexes
+        this.setRelativePosition()
+        currRoad.obstacles.push([this,currIndexes])
+        return true
+      }
+      constructor(game,obstacleType){
         super(game)
-        this.entityType="barrier"
-        this.width=BARRIER_WIDTH
-        this.directionOffset = directionOffset
-        this.direction = direction
-        this.sprite="bariyerr"
+        let curr = OBSTACLES[obstacleType]
+        this.entityType=obstacleType
+        this.isOnRoad=curr[0]
+        this.possibleRoads=curr[1]
+        this.width=curr[2]
+        this.sprite=curr[3]
+        this.sprite.zIndex=1
+        this.usedLanes=curr[5]??1
+        if(!game.obstacleCounters[obstacleType]){
+          game.obstacleCounters[obstacleType]=0
+        }
+        game.obstacleCounters[obstacleType]++
       }
     }
     export class Ocean extends Entity{
@@ -1100,6 +1539,15 @@ this.spriteWidth=this.spriteWidth??this.width
         this.sprite.tint=0x00ffaa
       }
     }
+    class Filler extends Entity{
+      anchorX=0.5
+      anchorY=0.5
+      constructor(game){
+        super(game)
+        this.width=ROAD_WIDTH
+        this.forceSquare=true
+      }
+    }
 export class BuildingSide extends Entity{
       constructor(game,parent,direction=0){
         super(game)
@@ -1110,20 +1558,18 @@ export class BuildingSide extends Entity{
         this.sprite.zIndex=4
       }
     }
-    export class Building extends Entity{
-      anchorX=0.5
-      anchorY=0.5
+    export class Building extends Filler{
+      tick=noop
       setPosition(x, y) {
         this.posX = x
         this.posY = y
         let ratio = 1-BUILDING_MULTIPLIER
         let mapWidth = this.game.map.length*ROAD_WIDTH
         let mapHeight = this.game.map[0].length*ROAD_WIDTH
-        let ratioX = (x-mapWidth/2)/mapWidth
-        let ratioY = (y-mapHeight/2)/mapHeight
+        let ratioX = (x-mapWidth*PERSPECTIVE[0])/mapWidth
+        let ratioY = (y-mapHeight*PERSPECTIVE[1])/mapHeight
         ratioX=Math.sqrt(Math.abs(ratioX))*Math.sign(ratioX)
         ratioY=Math.sqrt(Math.abs(ratioY))*Math.sign(ratioY)
-
         let offsetX = ratioX*ROAD_WIDTH*ratio
         let offsetY = ratioY*ROAD_WIDTH*ratio
         let leftSpace = ROAD_WIDTH*ratio/2
@@ -1178,21 +1624,27 @@ export class BuildingSide extends Entity{
         this.cachedLines=null
         this.currentGrids=this.getGrids()
       }
-      tick=noop
       spriteWidth=ROAD_WIDTH*BUILDING_MULTIPLIER
       constructor(game){
         super(game)
-        this.width=ROAD_WIDTH
-        this.forceSquare=true
         this.entityType="building"
         this.sprite="bina_test.png"
         this.sides=[new BuildingSide(game,this,90),new BuildingSide(game,this)]
-        let greenBackground = new PIXI.Graphics()
-        greenBackground.beginFill(0x3a741e||Math.floor(Math.random()*2**24));
-        greenBackground.drawRect(-ROAD_WIDTH/2, -ROAD_WIDTH/2, ROAD_WIDTH, ROAD_WIDTH)
-        greenBackground.endFill()
+        let background = getSprite("cim.jpg")
+        background.width=ROAD_WIDTH
+        //Anchor ile uyumlu olması için ya x ve y ayarlanmalı ya da anchor değiştirilmeli, bu hali negatif anchor'dan daha anlaşılır
+        background.x=-ROAD_WIDTH/2
+        background.y=-ROAD_WIDTH/2
+        this.childContainer.addChild(background)
         this.sprite.zIndex=4
-        this.childContainer.addChild(greenBackground)
+      }
+    }
+    export class Park extends Filler{
+      constructor(game){
+        super(game)
+        this.sprite="park alanı"
+        this.sprite.tint=0xd0e0d0
+        this.direction=[0,90,180,270][Math.floor(Math.random()*4)]
       }
     }
     export class Sensor extends MovableEntity{
@@ -1204,11 +1656,11 @@ export class BuildingSide extends Entity{
       output;
       xOffset=0
       yOffset=0
-      customCoords;
+      lineLength;
       getColliders(){
         return super.getColliders().filter(e=>e!=this.parent)
       }
-      getLines(isOffset){
+      getLines(isOffset,forDrawing=false){
         let xMultiplier = Math.cos(toRadian(this.parent._direction))
         let yMultiplier = Math.sin(toRadian(this.parent._direction))
         let xBaseMultiplier = Math.cos(toRadian(-this.parent.directionOffset))
@@ -1220,11 +1672,12 @@ export class BuildingSide extends Entity{
         let startX = (isOffset?xBaseOffset:this.parent.posX+xOffset)
         let startY = (isOffset?yBaseOffset:this.parent.posY+yOffset)
         let degree = toRadian(isOffset?this.offsetDegree:this.offsetDegree+this.parent.direction)
-        let lineEnd = [startX+this.length*Math.cos(degree),startY+this.length*Math.sin(degree)]
-        
-        return [[[startX,startY],lineEnd]]
+        let lineLength = forDrawing?this.lineLength:this.length
+        let endX = startX+lineLength*Math.cos(degree)
+        let endY = startY+lineLength*Math.sin(degree)
+        return [[[startX,startY],[endX,endY]]]
       }
-      drawLine(isOffset,curr=this.getLines(isOffset)[0]){
+      drawLine(isOffset,curr=this.getLines(isOffset,true)[0]){
         this.cachedLines=null
         if(this.destroyed)return
         this.graphics.clear()
@@ -1238,7 +1691,7 @@ export class BuildingSide extends Entity{
         let currColliders=this.getColliders()
         let isColliding=currColliders.length>0
         let currLine = this.getLines()[0]
-        let coords = null
+        let lineLength = this.length
         if(isColliding){
           let min = [this.length,null]
           currColliders.forEach(collider=>{
@@ -1246,8 +1699,8 @@ export class BuildingSide extends Entity{
             colliderLines.forEach(line=>{
               if(checkIntersects(currLine[0],currLine[1],line[0],line[1])){
                 let point = getIntersectionPoint(currLine,line)
-                coords=point
-                let distance = getMagnitude(point[0]-currLine[0],point[1]-currLine[1])
+                let distance = getMagnitude(point[0]-currLine[0][0],point[1]-currLine[0][1])
+                lineLength=Math.min(lineLength,distance)
                 if(distance<min[0]){
                   min=[min,collider]
                 }
@@ -1255,11 +1708,12 @@ export class BuildingSide extends Entity{
               }
             }) 
           })
-          //this.customCoords=coords??null
           this.output=min
         }
-        if(isColliding!=this.lastColliding){
-          if(!this.graphics.destroyed)this.graphics.setStrokeStyle(isColliding?{color:0xff0000}:{color:0x0000ff})
+        let lastLength = this.lineLength
+        this.lineLength=lineLength
+        if(isColliding!=this.lastColliding||lastLength!=lineLength){
+          if(!this.graphics.destroyed)this.graphics.setStrokeStyle({color:isColliding?0xff0000:0x0000ff})
           this.drawLine(true)
           this.lastColliding=isColliding
         }
@@ -1270,6 +1724,7 @@ export class BuildingSide extends Entity{
         this.xOffset=xOffset
         this.entityType="sensor"
         this.length=length
+        this.lineLength=length
         this.output=length
         this.offsetDegree=degree
         this.parent=parent
@@ -1372,6 +1827,11 @@ export class BuildingSide extends Entity{
       globalColliders=new Set()
       possibleStarts=[]
       destroyed=false
+      obstacleCounters=Object.fromEntries(Object.keys(OBSTACLES).map(e=>[e,0]))
+      minObstacles
+      maxObstacles
+      obstacleAmounts
+      possibleRoads=[]
       tick(dt){
         //Happens per physics calculation
         entities.forEach(entity => {
@@ -1384,7 +1844,7 @@ export class BuildingSide extends Entity{
         entities.forEach(e => e.setGraphics())
       }
       setMap(){
-        this.map=createMap()
+        this.map=pruneRoads(createMap())
       }
       setRoads(){
         let roads = []
@@ -1396,6 +1856,7 @@ export class BuildingSide extends Entity{
             if(i==0&&curr[0]==0&&(curr[1]==90||curr[1]==270))this.possibleStarts.push(j)
             let tempRoad = new Road(this,TYPE_TO_IMAGE[ROAD_TYPES_ARR[curr[0]]], 0, curr[1])
             roads[i][j]=tempRoad
+            this.possibleRoads.push([i,j])
             tempRoad.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
           }
         }
@@ -1414,18 +1875,123 @@ export class BuildingSide extends Entity{
             currOcean.setPosition(ROAD_WIDTH*(i+1),ROAD_WIDTH*j)
           })
         }
+        let fillers = [Building,Park]
+        let fillersCounters = {}
+        fillers.forEach(e=>fillersCounters[e]=[0,-1])
+        fillersCounters[Park][1]=1
         this.map.forEach((e,i)=>e.forEach((e,j)=>{
           let key = [i,j].join(",")
           if(e[0]==-1&&!filled[key]){
             filled[key]=true
-            let building = new Building(this)
-            building.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
+            let possibleFillers = fillers.filter(e=>fillersCounters[e][1]==-1||fillersCounters[e][0]<fillersCounters[e][1])
+            let currClass = possibleFillers[Math.floor(Math.random()*possibleFillers.length)]
+            fillersCounters[currClass][0]++
+            let filler = new currClass(this)
+            filler.setPosition(ROAD_WIDTH*i+ROAD_WIDTH/2,ROAD_WIDTH*j+ROAD_WIDTH/2)
           }
         }))
       }
-      setMapExtras(){
+      setMapExtras(onlySpecified){
         //TODO:
         //levha, engel vs. yerleştirilmesi
+        let currentObstacles = this.obstacleAmounts
+        let amountRange = [this.minObstacles,this.maxObstacles]
+        let minCounter = 0
+        let maxCounter = 0
+        let obstaclesArray = []
+        for(let e in OBSTACLES){
+          this.obstacleCounters[e]=0
+        }
+        for(let e in currentObstacles){
+          let o = currentObstacles[e]
+          let val = o
+          if(typeof o==="number"){
+            val=[o,o]
+            currentObstacles[e]=val
+          }
+          if(!(e in OBSTACLES_WITH_SIGN))obstaclesArray.push([e,val])
+          let [currMin,currMax] = val
+          minCounter+=currMin
+          maxCounter+=currMax
+        }
+        amountRange[0]=Math.max(minCounter,amountRange[0])
+        //yalnızca belirtilen değerlerin oluşturulması için
+        let obstacleAmount;
+        if(onlySpecified){
+          amountRange[1]=Math.max(minCounter,maxCounter) // max kısmı normalde gerekmemeli
+          obstacleAmount = Math.floor(Math.random()*(amountRange[1]-amountRange[0]))+amountRange[0]
+        }
+        else{
+          //diğer obstacle'lar da max değer ulaşılana kadar obstaclesArr'a eklenir
+          let remainingObstacles = Object.keys(OBSTACLES).filter(e=>{
+            //nesnesi olan levhalar direkt eklenmemeli, zaten nesne eklendiğinde levhası da beraberinde eklenecek
+            if(OBSTACLE_SIGNS.includes(e))return false
+            //halihazırda belirlenmiş olan nesnelerin değeri güncellenmeyecek
+            if(e in currentObstacles)return false
+            return true
+          })
+          if(!remainingObstacles.length){
+            //miktarı belirlenebilecek nesne yoksa hepsi önceden belirlenmiştir
+            onlySpecified=true
+            amountRange[1]=Math.max(minCounter,maxCounter)
+            obstacleAmount = Math.floor(Math.random()*(amountRange[1]-amountRange[0]))+amountRange[0]
+          }else{
+            obstacleAmount = Math.floor(Math.random()*(amountRange[1]-amountRange[0]))+amountRange[0]
+            let remainingAmount = obstacleAmount-minCounter
+            while(remainingAmount>0){
+              let index = Math.floor(Math.random()*remainingObstacles.length)
+              let randomObstacleName = remainingObstacles[index]
+              let randomAmount
+              if(remainingObstacles.length==1){
+                //miktar rastgele seçiliyor ama seçilen tamamen kullanılabilmeli
+                randomAmount=remainingAmount
+              }else{
+                randomAmount=Math.floor(Math.random()*(remainingAmount-1)/(1+Math.random()))+1
+              }
+              remainingAmount-=randomAmount
+              remainingObstacles.splice(index,1)
+              obstaclesArray.push([randomObstacleName,0,randomAmount])
+            }
+          }
+        }
+        //filtrelemeye ayrılan zamanı azaltmak için önceki filtreleneni filtreliyoruz
+        let lastRoads = this.possibleRoads
+        for(let i = 0;i<obstacleAmount;i++){
+          //Tüm yollardan levhası olmayan engel sayısı 2'den az olanları filtreliyoruz
+          //levhası olmayanlar ya levhadır ya da levhasıyla beraber gelmiyordur
+          // nesne ve levhasını ayrı ayrı saymamak için gerekiyor
+          let currRoads = lastRoads.filter(e=>{
+            let tempObstacles = this.roads[e[0]][e[1]].obstacles.filter(e=>{
+              return !OBSTACLES_WITH_SIGN[e]
+            })
+            return tempObstacles.length<2
+          })
+          if(!currRoads.length)return false
+          let currRoadIndex = currRoads[Math.floor(Math.random()*currRoads.length)]
+          let [indexX,indexY] = currRoadIndex
+          //önce minimum gereksinimi olan ve henüz sağlanmayanlar ayarlanır
+          let randomObstacles=obstaclesArray.filter(e=>e[1]>0&&this.obstacleCounters[e[0]]<e[1])
+          if(!randomObstacles.length){
+            randomObstacles=obstaclesArray.filter(e=>{
+              return this.obstacleCounters[e[0]]<e[2]
+            })
+          }
+          let randomObstacle=randomObstacles[Math.floor(Math.random()*randomObstacles.length)]
+          if(!randomObstacle)return false
+          let [obstacleName,obstacleMinAmount,obstacleMaxAmount] = randomObstacle
+          let obstacleAmount = this.obstacleCounters[obstacleName]
+          let hasSign = obstacleName in OBSTACLES_WITH_SIGN
+          let obstacle = new Obstacle(this,obstacleName)
+          obstacle.setRoad(indexX,indexY)
+          if(hasSign){
+            //TODO: nesnenin işareti de yola eklenecek
+            //işaretin aynı yolda olması gerekmiyor
+            //sağdaki, soldaki yola eklenmesi gerekirse o şekilde eklenir
+
+          }
+          lastRoads=currRoads
+        }
+        return true
       }
       destroy(){
         this.destroyed=true
@@ -1434,11 +2000,14 @@ export class BuildingSide extends Entity{
         }
         entities.forEach(e=>e.destroy())
       }
-      constructor(stage){
+      constructor(stage,obstacleAmounts={},onlySpecified=false,maxObstacles=12,minObstacles=4){
+        this.minObstacles=minObstacles
+        this.maxObstacles=maxObstacles
+        this.obstacleAmounts=obstacleAmounts
         this.stage=stage
         this.setMap()
         this.setEmpty()
-        this.setMapExtras()
         this.setRoads()
+        this.setMapExtras(onlySpecified)
       }
     }
