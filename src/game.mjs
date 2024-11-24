@@ -89,6 +89,11 @@ app.canvas.onpointerup = (e) => {
   }
   mainCar.setGoal(x, y);
 };
+let t = false
+setInterval(()=>{
+  //app.stage.tint=t?0xffffff:0x555555
+  t=!t
+},5000)
 let updateLoop = () => {
   let now = Date.now();
   let diff = now - lastUpdate;
