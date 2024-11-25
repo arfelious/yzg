@@ -81,79 +81,86 @@ let changeImageResolution = async (texture, options) => {
   });
 };
 const ROAD_TYPES_ARR = ['straight', 'rightcurve', '3', '4'];
-
-const OBSTACLES = {
-  rogar: {
-    isOnRoad: true,
-    roadTypes: ROAD_TYPES_ARR,
-    width: CAR_WIDTH * 2,
-    image: 'rogarKapagi.png',
-    useWidthAsHeight: true,
-    isRotated: true,
-    lanes: 1,
-    directionOffset: 90,
-  },
-  cukur: {
-    isOnRoad: true,
-    roadTypes: ROAD_TYPES_ARR,
-    width: CAR_WIDTH,
-    image: 'cukur.png',
-    useWidthAsHeight: false,
-    lanes: 1,
-    directionOffset: 90,
-  },
-  bariyer: {
-    isOnRoad: true,
-    roadTypes: ROAD_TYPES_ARR,
-    width: CAR_WIDTH,
-    image: 'bariyer.png',
-    useWidthAsHeight: true,
-    lanes: 1,
-  },
-  stopLevha: {
-    isOnRoad: false,
-    roadTypes: ['3', '4'],
-    width: (CAR_WIDTH * 2) / 3,
-    image: 'lvh.png',
-    useWidthAsHeight: false,
-    lanes: 1,
-  },
-  kasis: {
-    isOnRoad: true,
-    roadTypes: ROAD_TYPES_ARR,
-    width: ROAD_WIDTH / 2,
-    image: 'kasis.png',
-    useWidthAsHeight: true,
-    lanes: 2,
-  },
-  kasisLevha: {
-    isOnRoad: false,
-    roadTypes: ROAD_TYPES_ARR,
-    width: CAR_WIDTH,
-    image: 'kasisLevha.png',
-    useWidthAsHeight: false,
-    lanes: 1,
-  },
-  yayaLevha: {
-    isOnRoad: false,
-    roadTypes: ROAD_TYPES_ARR,
-    width: (CAR_WIDTH * 2) / 3,
-    image: 'lvh2.png',
-    useWidthAsHeight: false,
-    lanes: 1,
-  },
-};
+// 1550. satır civarı olan isimler kullanılabilir
+//ilk değer true ise yoldadır, değilse kenardadır
+//ikinci değer hangi tür yollarda olabileceği
+//üçüncü değer nesnenin genişliği
+//dördüncü değer nesnenin resim ismi
+//beşinci değer genişliğin yükseklik olarak kullanılması
+//altıncı değer yol üzerindeki engeller için kaç şerit kapladığı
+//yedinci değer (varsa) nesne yönünü (directionOffset)
 
 // const OBSTACLES = {
-//   "rogar":[true,ROAD_TYPES_ARR,CAR_WIDTH*2,"rogarKapagi.png",true,1,90],
-//   "cukur":[true,ROAD_TYPES_ARR,CAR_WIDTH,"cukur.png",false,1,90],
-//   "bariyer":[true,ROAD_TYPES_ARR,CAR_WIDTH,"bariyer.png",true,1],
-//   "stopLevha":[false,["3","4"],CAR_WIDTH*2/3,"lvh.png",false,1],
-//   "kasis":[true,ROAD_TYPES_ARR,ROAD_WIDTH/2,"kasis.png",true,2],
-//   "kasisLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH,"kasisLevha.png",false,1],
-//   "yayaLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH*2/3,"lvh2.png",false,1],
-// }
+//   rogar: {
+//     isOnRoad: true,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: CAR_WIDTH * 2,
+//     image: 'rogarKapagi.png',
+//     useWidthAsHeight: true,
+//     isRotated: true,
+//     lanes: 1,
+//     directionOffset: 90,
+//   },
+//   cukur: {
+//     isOnRoad: true,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: CAR_WIDTH,
+//     image: 'cukur.png',
+//     useWidthAsHeight: false,
+//     lanes: 1,
+//     directionOffset: 90,
+//   },
+//   bariyer: {
+//     isOnRoad: true,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: CAR_WIDTH,
+//     image: 'bariyer.png',
+//     useWidthAsHeight: true,
+//     lanes: 1,
+//   },
+//   stopLevha: {
+//     isOnRoad: false,
+//     roadTypes: ['3', '4'],
+//     width: (CAR_WIDTH * 2) / 3,
+//     image: 'lvh.png',
+//     useWidthAsHeight: false,
+//     lanes: 1,
+//   },
+//   kasis: {
+//     isOnRoad: true,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: ROAD_WIDTH / 2,
+//     image: 'kasis.png',
+//     useWidthAsHeight: true,
+//     lanes: 2,
+//   },
+//   kasisLevha: {
+//     isOnRoad: false,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: CAR_WIDTH,
+//     image: 'kasisLevha.png',
+//     useWidthAsHeight: false,
+//     lanes: 1,
+//   },
+//   yayaLevha: {
+//     isOnRoad: false,
+//     roadTypes: ROAD_TYPES_ARR,
+//     width: (CAR_WIDTH * 2) / 3,
+//     image: 'lvh2.png',
+//     useWidthAsHeight: false,
+//     lanes: 1,
+//   },
+// };
 
+const OBSTACLES = {
+  rogar: [true, ROAD_TYPES_ARR, CAR_WIDTH * 2, 'rogarKapagi.png', true, 1, 90],
+  cukur: [true, ROAD_TYPES_ARR, CAR_WIDTH, 'cukur.png', false, 1, 90],
+  bariyer: [true, ROAD_TYPES_ARR, CAR_WIDTH, 'bariyer.png', true, 1],
+  stopLevha: [false, ['3', '4'], (CAR_WIDTH * 2) / 3, 'lvh.png', false, 1],
+  kasis: [true, ROAD_TYPES_ARR, ROAD_WIDTH / 2, 'kasis.png', true, 2],
+  kasisLevha: [false, ROAD_TYPES_ARR, CAR_WIDTH, 'kasisLevha.png', false, 1],
+  yayaLevha: [false, ROAD_TYPES_ARR, (CAR_WIDTH * 2) / 3, 'lvh2.png', false, 1],
+};
 const OBSTACLE_SIGNS = [];
 const OBSTACLES_WITH_SIGN = Object.fromEntries(
   Object.keys(OBSTACLES)
@@ -167,9 +174,9 @@ const OBSTACLES_WITH_SIGN = Object.fromEntries(
     })
     .map((e) => [e, 1])
 );
-const OBSTACLE_IMAGES = Object.values(OBSTACLES).map((e) => e.image);
+const OBSTACLE_IMAGES = Object.values(OBSTACLES).map((e) => e[3]);
 const OBSTACLE_IMAGE_TO_NAME = Object.fromEntries(
-  Object.entries(OBSTACLES).map((e) => [e[1].image, e[0]])
+  Object.entries(OBSTACLES).map((e) => [e[1][3], e[0]])
 );
 // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
 const ROAD_IMAGES = ['duzyol.png', 'yol1.png', 'yol3.png', 'dortyol.png'];
