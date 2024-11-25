@@ -81,14 +81,6 @@ let changeImageResolution = async (texture, options) => {
   });
 };
 const ROAD_TYPES_ARR = ['straight', 'rightcurve', '3', '4'];
-// 1550. satır civarı olan isimler kullanılabilir
-//ilk değer true ise yoldadır, değilse kenardadır
-//ikinci değer hangi tür yollarda olabileceği
-//üçüncü değer nesnenin genişliği
-//dördüncü değer nesnenin resim ismi
-//beşinci değer genişliğin yükseklik olarak kullanılması
-//altıncı değer yol üzerindeki engeller için kaç şerit kapladığı
-//yedinci değer (varsa) nesne yönünü (directionOffset)
 
 const OBSTACLES = {
   rogar: {
@@ -175,9 +167,9 @@ const OBSTACLES_WITH_SIGN = Object.fromEntries(
     })
     .map((e) => [e, 1])
 );
-const OBSTACLE_IMAGES = Object.values(OBSTACLES).map((e) => e[3]);
+const OBSTACLE_IMAGES = Object.values(OBSTACLES).map((e) => e.image);
 const OBSTACLE_IMAGE_TO_NAME = Object.fromEntries(
-  Object.entries(OBSTACLES).map((e) => [e[1][3], e[0]])
+  Object.entries(OBSTACLES).map((e) => [e[1].image, e[0]])
 );
 // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
 const ROAD_IMAGES = ['duzyol.png', 'yol1.png', 'yol3.png', 'dortyol.png'];
