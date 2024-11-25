@@ -94,7 +94,7 @@ let updateLoop = () => {
   let diff = now - lastUpdate;
   accumulatedTime += diff;
   while (accumulatedTime >= FIXED_LOOP_MS) {
-    if (isDown[" "]) {
+    if (isDown[" "]||isDown["button_BRAKE"]) {
       mainCar.brake(FIXED_LOOP_S);
     }
     if (isDown["W"] || isDown["ARROWUP"] || isDown["button_UP"]) {
