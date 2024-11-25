@@ -11,7 +11,7 @@ import {
   getIndexes,
 } from "../src/engine.mjs";
 
-let game = new Game();
+let game = new Game(app.stage);
 let currentStart =
   game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
@@ -19,50 +19,33 @@ let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
 mainCar.setPosition(80, 50 + roadOffsetY);
 //--------------------------------------------------
-
 // WASD Butonları
 const controlButtons = {
   up: document.getElementById("control-up"),
   left: document.getElementById("control-left"),
   down: document.getElementById("control-down"),
   right: document.getElementById("control-right"),
+  brake: document.getElementById("control-brake"), // Fren için (space button)
 };
 
 // Kontrol işlevleri
-let moveIntervals = {};
-
 const startMove = (direction) => {
-  if (moveIntervals[direction]) return; // Aynı yönde zaten hareket varsa tekrarlamayı engelle
-
-  moveIntervals[direction] = setInterval(() => {
-    if (direction === "up") mainCar.moveForward(0.01);
-    if (direction === "down") mainCar.moveBackward(0.01);
-    if (direction === "left") mainCar.steerLeft(0.01);
-    if (direction === "right") mainCar.steerRight(0.01);
-  }, 8);
+  isDown["button_" + direction.toUpperCase()] = true;
 };
 
 const stopMove = (direction) => {
-  clearInterval(moveIntervals[direction]);
-  moveIntervals[direction] = null;
+  isDown["button_" + direction.toUpperCase()] = false;
+};
+// Butonlara olay dinleyicileri ekleme
+const addControlListeners = (button, direction) => {
+  button.addEventListener("pointerdown", () => startMove(direction));
+  button.addEventListener("pointerup", () => stopMove(direction));
+  button.addEventListener("pointerout", () => stopMove(direction));
 };
 
-// Butonlara olay dinleyicileri ekleme
-controlButtons.up.addEventListener("pointerdown", () => startMove("up"));
-controlButtons.down.addEventListener("pointerdown", () => startMove("down"));
-controlButtons.left.addEventListener("pointerdown", () => startMove("left"));
-controlButtons.right.addEventListener("pointerdown", () => startMove("right"));
-
-controlButtons.up.addEventListener("pointerup", () => stopMove("up"));
-controlButtons.down.addEventListener("pointerup", () => stopMove("down"));
-controlButtons.left.addEventListener("pointerup", () => stopMove("left"));
-controlButtons.right.addEventListener("pointerup", () => stopMove("right"));
-
-// Pointerout eklendi -> (parmak kayarsa durması için)
-controlButtons.up.addEventListener("pointerout", () => stopMove("up"));
-controlButtons.down.addEventListener("pointerout", () => stopMove("down"));
-controlButtons.left.addEventListener("pointerout", () => stopMove("left"));
-controlButtons.right.addEventListener("pointerout", () => stopMove("right"));
+Object.entries(controlButtons).forEach(([direction, button]) => {
+  addControlListeners(button, direction);
+});
 
 //--------------------------------------------------
 
@@ -114,16 +97,16 @@ let updateLoop = () => {
     if (isDown[" "]) {
       mainCar.brake(FIXED_LOOP_S);
     }
-    if (isDown["W"] || isDown["ARROWUP"]) {
+    if (isDown["W"] || isDown["ARROWUP"] || isDown["button_UP"]) {
       mainCar.moveForward(FIXED_LOOP_S);
     }
-    if (isDown["S"] || isDown["ARROWDOWN"]) {
+    if (isDown["S"] || isDown["ARROWDOWN"] || isDown["button_DOWN"]) {
       mainCar.moveBackward(FIXED_LOOP_S);
     }
-    if (isDown["A"] || isDown["ARROWLEFT"]) {
+    if (isDown["A"] || isDown["ARROWLEFT"] || isDown["button_LEFT"]) {
       mainCar.steerLeft(FIXED_LOOP_S);
     }
-    if (isDown["D"] || isDown["ARROWRIGHT"]) {
+    if (isDown["D"] || isDown["ARROWRIGHT"] || isDown["button_RIGHT"]) {
       mainCar.steerRight(FIXED_LOOP_S);
     }
     game.tick(FIXED_LOOP_S);
@@ -149,6 +132,7 @@ const bitmapFontText = new BitmapText({
 bitmapFontText.x = (WIDTH - fpsFontSize) / 2;
 bitmapFontText.y = 0;
 app.stage.addChild(bitmapFontText);
+bitmapFontText.zIndex = 999;
 let modelIdentifier = Math.random().toString(36).slice(2);
 let model = await fetch("https://bilis.im/yzgmodel").then(
   (r) => r.json(),
@@ -156,12 +140,15 @@ let model = await fetch("https://bilis.im/yzgmodel").then(
 );
 // FPS Hesaplama
 let secondCounter = 0;
+window.frameTimes = frameTimes;
 setInterval(() => {
   let now = Date.now();
   frameTimes = frameTimes.filter((e) => now - e < 1000);
   frameText = frameTimes.length.toString();
-  bitmapFontText.text = frameText;
-  bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2;
+  if(!bitmapFontText.destroyed&&!game.destroyed){
+    bitmapFontText.text = frameText;
+    bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2;
+  }
   if (secondCounter++ % 30 == 0) {
     fetch("https://bilis.im/yzgmodelGuncelle", {
       method: "POST",
