@@ -2040,7 +2040,7 @@ export class Obstacle extends MovableEntity {
     let multiplier = ROAD_WIDTH / 2 - this.width / 2;
     let [relX, relY] = indexes.map((e) => e * multiplier);
     if (this.isOnRoad) {
-      let divider = this.usedLanes == 2 ? 0 : 12;
+      let divider = this.usedLanes == 2 ? 0 : 8;
       //normalde T tipi yolda soldakiler sırasıyla düz ters, sağdakiler ters düz olurdu
       //ikisinin aynı olması için ikisinin de sağdaki gibi davranması lazım
       let currentAngle = getNormalizedAngle(
