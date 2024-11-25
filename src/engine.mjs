@@ -1,15 +1,14 @@
     /*
     TODO:
           GENEL OPTİMİZASYON
+          ışıklar mantıklı hale getirilecek
           a* ve ucs kontrol edilecek
-            ilk yool bloğunun sonuna gelinse de gidilememesi gereken bir yöne gidilebiliyor
+            ilk yol bloğunun sonuna gelinse de gidilememesi gereken bir yöne gidilebiliyor
           alternatif 1'in tüm özellikleri a*'da bulunmuyor, güncellenecek
           obstacles array değil, açıklayıcı kelimeler içeren object olmalı
           rightcurve için engeller sınırlanmalı
           okyanus dibindeki yollara random kum veya beton, collision gerekmeyeceği için childGraphics kullanılabilir
           engellerin bulunabileceği yol türleri düzgün ayarlanmalı
-          kasis, çukur vs. şeride özel olmalı
-            açıları da ona göre ayarlanmalı
           nesnelerin levhaları beraberinde eklenmeli
           nesnelerin boyutları ve yolda hizalanmaları ayarlanmalı
           setMapExtras kod tekrarı düşürülecek
@@ -47,12 +46,13 @@
     export const MIN_ALIGNMENT = 0.7
     export const PATH_START_INDEX = 2
     export const BUILDING_MULTIPLIER = 0.9
+    export const LIGHT_CHANGE_TICK = 500
     export let highlightStyle = {color:0x006699,width:4}
     export const app = new PIXI.Application();
     export const { BitmapText } = PIXI;
     await app.init({ width: WIDTH, height: HEIGHT, antialias: true, autoDensity: true});
     const IS_DEBUG = false //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-    const DIRECTION_ALTERNATIVE = 2 // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
+    const DIRECTION_ALTERNATIVE = 1 // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
     const PERSPECTIVE = [0.5,0.5] // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
     let changeImageResolution=async (texture, options)=>{
       if(!options)return texture
@@ -76,20 +76,22 @@
       })
     }
     const ROAD_TYPES_ARR = ["straight","rightcurve","3","4"]
+    // 1550. satır civarı olan isimler kullanılabilir
     //ilk değer true ise yoldadır, değilse kenardadır
     //ikinci değer hangi tür yollarda olabileceği
     //üçüncü değer nesnenin genişliği
     //dördüncü değer nesnenin resim ismi
     //beşinci değer genişliğin yükseklik olarak kullanılması
-    //altıncı değer (varsa) yol üzerindeki engeller için kaç şerit kapladığı
+    //altıncı değer yol üzerindeki engeller için kaç şerit kapladığı
+    //yedinci değer (varsa) nesne yönünü (directionOffset)
     const OBSTACLES = {
-      "rogar":[true,ROAD_TYPES_ARR,CAR_WIDTH*2,"rogarKapagi.png",true],
-      "cukur":[true,ROAD_TYPES_ARR,CAR_WIDTH,"cukur.png",false],
-      "bariyer":[true,ROAD_TYPES_ARR,CAR_WIDTH,"bariyer.png",true],
-      "stopLevha":[false,["3","4"],CAR_WIDTH*2/3,"lvh.png",false],
+      "rogar":[true,ROAD_TYPES_ARR,CAR_WIDTH*2,"rogarKapagi.png",true,1,90],
+      "cukur":[true,ROAD_TYPES_ARR,CAR_WIDTH,"cukur.png",false,1,90],
+      "bariyer":[true,ROAD_TYPES_ARR,CAR_WIDTH,"bariyer.png",true,1],
+      "stopLevha":[false,["3","4"],CAR_WIDTH*2/3,"lvh.png",false,1],
       "kasis":[true,ROAD_TYPES_ARR,ROAD_WIDTH/2,"kasis.png",true,2],
-      "kasisLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH,"kasisLevha.png",false],
-      "yayaLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH*2/3,"lvh2.png",false],
+      "kasisLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH,"kasisLevha.png",false,1],
+      "yayaLevha":[false,ROAD_TYPES_ARR,CAR_WIDTH*2/3,"lvh2.png",false,1],
     }
     const OBSTACLE_SIGNS = []
     const OBSTACLES_WITH_SIGN = Object.fromEntries(Object.keys(OBSTACLES).filter(e=>{
@@ -106,12 +108,13 @@
     const ROAD_IMAGES = ["duzyol.png", "yol1.png","yol3.png","dortyol.png"]
     const IMAGE_TO_TYPE = {"duzyol.png":"straight","yol1.png":"rightcurve","yol3.png":"3","dortyol.png":"4"}
     const TYPE_TO_IMAGE = {"straight":"duzyol.png","rightcurve":"yol1.png","3":"yol3.png","4":"dortyol.png"}
+    const LIGHT_IMAGES = ["light_r.png","light_y.png","light_g.png","light_off.png"]
     const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e,i)=>[e,i]))
-    let imagesArray = ["temp_car.png","ocean.jpeg","bina_test.png","bina_yan.png","park alanı.jpg","cim.jpg",...ROAD_IMAGES,...OBSTACLE_IMAGES]
+    let imagesArray = ["temp_car.png","ocean.jpeg","bina_test.png","bina_yan.png","park alanı.jpg","cim.jpg",...ROAD_IMAGES,...OBSTACLE_IMAGES,...LIGHT_IMAGES]
     //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
     let intendedWidths = {"temp_car.png":[CAR_WIDTH,true],"ocean.jpeg":[ROAD_WIDTH],"bina_test.png":[ROAD_WIDTH],"bina_yan.png":[ROAD_WIDTH],"park alanı.jpg":[ROAD_WIDTH],"cim.jpg":[ROAD_WIDTH]};
     //tüm engel ve yol resimleri için resimler ölçeklenecek
-    let toScale = [...ROAD_IMAGES.map(e=>[e,false]),...OBSTACLE_IMAGES.map(e=>[e,OBSTACLE_IMAGE_TO_NAME[e][4]])]
+    let toScale = [...ROAD_IMAGES.map(e=>[e,false]),LIGHT_IMAGES.map(e=>[e,false]),...OBSTACLE_IMAGES.map(e=>[e,OBSTACLE_IMAGE_TO_NAME[e][4]])]
     toScale.forEach(e=>intendedWidths[e[0]]=[ROAD_WIDTH,e[1]||false])
     const ROAD_TYPES = {"straight":[0,180],"rightcurve":[90,180],"3":[0,90,270],"4":[0,90,180,270]}
     let angleLookup = {0:"up",90:"right",180:"down",270:"left"}
@@ -119,6 +122,7 @@
     let connectionLookup = {"up":0,"right":1,"down":2,"left":3}
     const LINE_AMOUNTS = {"straight":4,"4":8,"3":5,"rightcurve":10}
     const ROAD_WEIGHTS = {"3":0.5,"4":0.5}
+    const LIGHT_STATES = ["RED","YELLOW","GREEN"]
     let startTime = Date.now()
     let getRoadWeight = roadType=>{
       return ROAD_WEIGHTS[roadType]||1
@@ -649,16 +653,19 @@
       return (Q[0] < Math.max(P[0], R[0]) && Q[0] > Math.min(P[0], R[0]) &&
         Q[1] < Math.max(P[1], R[1]) && Q[1] > Math.min(P[1], R[1]));
     }
-    let getLaneCoordinates = (direction,coords,laneMultiplier,roadDivider=8)=>{ //laneMultiplier 1 ise sağ, -1 ise sol
-      let index = connectionLookup[direction]
+    let getLaneOffset = (direction,laneMultiplier,roadDivider=8)=>{
       const LINE_OFFSET = roadDivider>0?ROAD_WIDTH/roadDivider:0
       let offsetArr = [[-LINE_OFFSET,0],[0,-LINE_OFFSET],[LINE_OFFSET,0],[0,LINE_OFFSET]]
+      let index = connectionLookup[direction]
       let [xOffset,yOffset]=offsetArr[index]
-      //if(xOffset!=0&&laneMultiplier==1)xOffset-=widthOffset
-      //if(yOffset!=0&&laneMultiplier==-1)yOffset-=widthOffset
-
-      let targetX = coords[0] * ROAD_WIDTH + ROAD_WIDTH / 2+xOffset*laneMultiplier;
-      let targetY = coords[1] * ROAD_WIDTH + ROAD_WIDTH / 2+yOffset*laneMultiplier;
+      xOffset*=laneMultiplier
+      yOffset*=laneMultiplier
+      return [xOffset,yOffset]
+    }
+    let getLaneCoordinates = (direction,coords,laneMultiplier,roadDivider=8)=>{ //laneMultiplier 1 ise sağ, -1 ise sol
+      let [xOffset,yOffset] = getLaneOffset(direction,laneMultiplier,roadDivider)
+      let targetX = coords[0] * ROAD_WIDTH + ROAD_WIDTH / 2+xOffset;
+      let targetY = coords[1] * ROAD_WIDTH + ROAD_WIDTH / 2+yOffset;
       return [targetX,targetY]
     }
     //bunun türetilişine bakılacak
@@ -689,7 +696,7 @@
       if (o4 == 0 && isOnLineSegment(C, B, D)) return true;
       return false;
     }
-    export let getIndexes = (x,y)=>[Math.floor(x/ROAD_WIDTH),Math.floor(y/ROAD_WIDTH)]
+    export let getIndexes = (x,y,anchorDiffX=0,anchorDiffY=anchorDiffX)=>[Math.floor((x-anchorDiffX)/ROAD_WIDTH),Math.floor((y-anchorDiffY)/ROAD_WIDTH)]
     let toDegree = (x) => (x / Math.PI) * 180;
     let getBounds = sprite => {
       let extracted = app.renderer.extract.pixels(sprite)
@@ -826,6 +833,11 @@
         return entities.filter(e => {
           let cachedGrids =e.currentGrids
           if (e == this||e.entityType=="sensor"||(this.entityType!="sensor"&&cachedGrids.isDisjointFrom(currGrids))) return false
+          //normalde genişliğin yarısına bakmak yeterli olmalı ama nesnelerin anchor'ına bakmadan emin olunamıyor
+          //yollar için emin olunabilir
+          //sqrt2 kısmı merkezden max uzaklık için
+          let distance = getMagnitude(this.posX-e.posX,this.posY-e.posY)
+          if(distance>(this.width+e.width)*Math.SQRT2)return
           let entityLines = e.getLines()
           return currLines.find(l1 => {
             let retVal = entityLines.find(l2 => checkIntersects(l1[0],l1[1],l2[0],l2[1]))
@@ -842,7 +854,9 @@
         this.height = this.forceSquare ? this.spriteWidth : this.spriteWidth * this.ratio
         sprite.setSize(this.spriteWidth, this.height);
         sprite.anchor.set(this.anchorX, this.anchorY);
+        let hadSprite = !!this._sprite
         this._sprite = sprite;
+        if(hadSprite)return
         this.scaledBounds = [this.bounds[0][0], this.bounds[0][1], this.bounds[3][0] - this.bounds[0][0]+1, this.bounds[3][1] - this.bounds[0][1]+1].map(e => e * this.scale)
         app.stage.addChild(this.childContainer)
         if (this.createGraphics) {
@@ -920,7 +934,7 @@
       setPosition(x, y) {
         this.posX = x
         this.posY = y
-        this.gridIndexes=getIndexes(x,y)
+        this.gridIndexes=getIndexes(x,y,this.anchorX*this.width,this.anchorY*this.height)
         this.cachedLines=null
         this.currentGrids=this.getGrids()
         this.redrawNecessary=true
@@ -937,13 +951,20 @@
       get sprite() {
         return this._sprite;
       }
+      spriteCache={}
       set sprite(currSpritePath) {
         if (this._sprite) app.stage.removeChild(this._sprite);
         if (!this.inScene) {
           this.inScene = true;
         }
         this.spriteName=currSpritePath
-        let sprite = getSprite(currSpritePath)
+        let sprite;
+        if(this.spriteCache[currSpritePath]){
+          sprite=this.spriteCache[currSpritePath]
+        }else {
+          sprite=getSprite(currSpritePath)
+          this.spriteCache[currSpritePath]=sprite
+        }
         this.init(sprite)
         app.stage.addChild(sprite);
         sprite.zIndex = this.zIndex
@@ -1021,7 +1042,7 @@
         let posChangeY = this.velY*dt*absAlignment
         this.posX += posChangeX
         this.posY += posChangeY
-        let newIndexes = getIndexes(this.posX,this.posY)
+        let newIndexes = getIndexes(this.posX,this.posY,this.anchorX*this.width,this.anchorY*this.height)
         if(!arrayEquals(this.gridIndexes,newIndexes)){
           let oldIndexes = this.gridIndexes
           this.gridIndexes=newIndexes
@@ -1069,6 +1090,7 @@
       }
     }
     export class Car extends MovableEntity {
+      recordedData={inputs:[],outputs:[]}
       isMain=false
       isUsingBrake = false
       isAutonomous=true
@@ -1084,6 +1106,14 @@
       sensors=[]
       pathAlgorithm="dfs"
       laneMultiplier=1
+      currentRoad=null
+      isRecording=false
+      setRecording(value=!this.isRecording){
+        this.isRecording=value
+      }
+      recordData(){
+        this.setRecording(true)
+      }
       switchLane(){
         this.laneMultiplier*=-1
       }
@@ -1213,10 +1243,58 @@
       
       tick(dt) {
         super.tick(dt)
+        /*
+                if (!this.goal || !Array.isArray(this.goal) || this.goal.length < 2) {
+          return;
+        }
+      
+        const sensorReadings = this.sensors.map(sensor => {
+          if (isNaN(sensor.output)) {
+            return 0; 
+          }
+          return sensor.output / this.width; // Sensör verilerine normalize etme
+        });
+      
+        const relativeGoal = [
+          (this.goal[0] - this.posX) / this.game.map.length,
+          (this.goal[1] - this.posY) / this.game.map[0].length,
+        ];
+      
+        const velocity = [
+          this.velX / MOVE_MULTIPLIER,
+          this.velY / MOVE_MULTIPLIER,
+        ];
+      
+        const inputs = [...sensorReadings, ...relativeGoal, ...velocity];
+        const outputs = [
+          this.getAlignment() < 0 ? -1 : 1,
+          this.isUsingBrake ? -1 : 1,
+        ];
+      
+        this.trainingData.inputs.push(inputs);
+        this.trainingData.outputs.push(outputs);
+        */
         let nextColliders = this.getColliders()
         this.fillColor = nextColliders.length == 0 ? 0xff9900 : 0xff0000
         this.game.globalColliders.add(nextColliders)
         this.lastColliders = nextColliders
+        if(this.isRecording){
+          if(this.goal){
+            let relativeGoal = [(this.goal[0]-this.posX)/GRID_WIDTH,(this.goal[1]-this.posY)/GRID_HEIGHT]
+            let relativePathCoords = this.path[1]||this.path[0]
+            let relativeDirection = getRelativeDirection(this.path.length>1?this.path[0]:this.gridIndexes,relativePathCoords)
+            let relativePath = getLaneCoordinates(relativeDirection,relativePathCoords,this.laneMultiplier)
+            relativePath=[(relativePath[0]-this.posX)/ROAD_WIDTH,(relativePath[1]-this.posY)/ROAD_WIDTH]
+            const velocity = [
+              this.velX / MOVE_MULTIPLIER,
+              this.velY / MOVE_MULTIPLIER,
+            ]
+            let input = [...this.sensors.map(e=>e.output[0]/this.width),...relativeGoal,...relativePath,...velocity]
+            let output = [this.getAlignment()<0?-1:1,this.isUsingBrake?-1:1]
+            this.recordedData.inputs.push(input)
+            this.recordedData.outputs.push(output)
+          }
+        }
         this.isUsingBrake = false
       }
       accelerate(dt = 1, scale = 1) {
@@ -1269,8 +1347,14 @@
         this.customLine.destroy()
         cars.splice(cars.indexOf(this), 1)
       }
+      setRoad(){
+        let currRoad = this.game.roads[this.gridIndexes[0]]?.[this.gridIndexes[1]]
+        if(!currRoad)currRoad=null
+        this.currentRoad=currRoad
+      }
       constructor(game,spritePath, createGraphics = false) {
         super(game)
+        this.onIndexChange.push(this.setRoad)
         this.onIndexChange.push(this.resetPath)
         this.childGraphics.push(this.customLine)
         this.width = CAR_WIDTH
@@ -1297,6 +1381,8 @@
       }
     }
     export class Road extends Entity {
+      anchorX=0.5
+      anchorY=0.5
       obstacles=[]
       #alignObstacles(){
         return this.obstacles.forEach(e=>e.setRelativePosition())
@@ -1447,8 +1533,6 @@
       }
       constructor(game,spritePath, directionOffset, direction) {
         super(game)
-        this.anchorX=0.5
-        this.anchorY=0.5
         this.entityType="road"
         this.zIndex = 0
         this.drawCollision=IS_DEBUG
@@ -1475,23 +1559,24 @@
       chosenLane //1 ise sağ şerit, -1 ise sol şerit. çift şerit genişliğindeyse de -1 çünkü çizimin başladığı şerit sol 
       //çarpılabilir olarak ayarlanan nesnelerin konumu göreli olmaması gerektiği için childContainer kullanılamaz
       usedLanes=1
+      zIndex=2
+      directionOffset=0
+      isCollisionEffected=false
       setRelativePosition(){
         let indexes = getRelativeSubgridIndex(this.subgridIndexes,this.parent._direction)
         let multiplier = ROAD_WIDTH/2-this.width/2
         let [relX,relY] = indexes.map(e=>e*multiplier)
-        let resX,resY
         if(this.isOnRoad){
-          let parentGrid = getIndexes(this.parent.posX,this.parent.posY)
           let divider = this.usedLanes==2?0:12
-          let currentAngle = getNormalizedAngle(getSubgridAngle(indexes));
-          [resX,resY] = getLaneCoordinates(angleLookup[currentAngle],parentGrid,this.chosenLane,divider)
-          resX+=relX
-          resY-=relY
-          console.log("ress",resX,resY,this.parent.posX,this.parent.posY,indexes,relX,relY)
-          this._direction=currentAngle
-        }else{
-          [resX,resY]=[this.parent.posX+relX,this.parent.posY-relY]
+          //normalde T tipi yolda soldakiler sırasıyla düz ters, sağdakiler ters düz olurdu
+          //ikisinin aynı olması için ikisinin de sağdaki gibi davranması lazım
+          let currentAngle = getNormalizedAngle(getSubgridAngle(indexes.map(e=>Math.abs(e))));
+          let [relOffsetX,relOffsetY] = getLaneOffset(angleLookup[currentAngle],this.chosenLane,divider)
+          relX+=relOffsetX
+          relY+=relOffsetY
+          this.direction=currentAngle
         }
+        let [resX,resY]=[this.parent.posX+relX,this.parent.posY-relY]
         this.setPosition(resX,resY)
       }
       setRoad(gridX,gridY){
@@ -1505,7 +1590,7 @@
         if(!possibleSubGridIndexes.length)return false
         let currIndexes=possibleSubGridIndexes[Math.floor(Math.random()*possibleSubGridIndexes.length)]
         if(this.isOnRoad){
-          this.chosenLane=this.usedLanes==2?-1:Math.round(Math.random())+1
+          this.chosenLane=this.usedLanes==2?-1:Math.floor(Math.random())?1:-1
         }
         this.subgridIndexes=currIndexes
         this.setRelativePosition()
@@ -1515,17 +1600,47 @@
       constructor(game,obstacleType){
         super(game)
         let curr = OBSTACLES[obstacleType]
-        this.entityType=obstacleType
-        this.isOnRoad=curr[0]
+        this.entityType=obstacleType||"obstacle"
+        this.isOnRoad=!curr||curr[0]
+        if(!this.isOnRoad)this.isCollisionEffected=false
+        if(!curr)return
         this.possibleRoads=curr[1]
         this.width=curr[2]
         this.sprite=curr[3]
-        this.sprite.zIndex=1
         this.usedLanes=curr[5]??1
+        this.directionOffset=curr[6]??0
         if(!game.obstacleCounters[obstacleType]){
           game.obstacleCounters[obstacleType]=0
         }
         game.obstacleCounters[obstacleType]++
+      }
+    }
+    export class Light extends Obstacle{
+      lastChangeTick=0
+      spriteIndex=0
+      directionOffset=270
+      sprites=[]
+      state=LIGHT_STATES[0]
+      setSprite(){
+        this.sprite=this.sprites[this.spriteIndex%this.sprites.length]
+      }
+      tick(dt){
+        let changeTick = ~~(this.tickCounter/LIGHT_CHANGE_TICK)
+        if(changeTick!=this.lastChangeTick){
+          this.spriteIndex++
+          this.state=LIGHT_STATES[this.spriteIndex%LIGHT_STATES.length]
+          this.setSprite()
+          this.setPosition(this.posX,this.posY)
+          this.lastChangeTick=changeTick
+        }
+        super.tick(dt)
+      }
+      constructor(game){
+        super(game)
+        this.sprites=["light_r","light_y","light_g"]
+        this.entityType="light"
+        this.width=CAR_WIDTH
+        this.setSprite()
       }
     }
     export class Ocean extends Entity{
@@ -1535,7 +1650,7 @@
         this.entityType="ocean"
         this.width=ROAD_WIDTH
         this.sprite="ocean.jpeg"
-        this.sprite.zIndex=0
+        this.sprite.zIndex=3
         this.sprite.tint=0x00ffaa
       }
     }
@@ -1548,7 +1663,7 @@
         this.forceSquare=true
       }
     }
-export class BuildingSide extends Entity{
+    export class BuildingSide extends Entity{
       constructor(game,parent,direction=0){
         super(game)
         this.parent=parent
@@ -1702,7 +1817,7 @@ export class BuildingSide extends Entity{
                 let distance = getMagnitude(point[0]-currLine[0][0],point[1]-currLine[0][1])
                 lineLength=Math.min(lineLength,distance)
                 if(distance<min[0]){
-                  min=[min,collider]
+                  min=[distance,collider]
                 }
 
               }
@@ -1725,7 +1840,7 @@ export class BuildingSide extends Entity{
         this.entityType="sensor"
         this.length=length
         this.lineLength=length
-        this.output=length
+        this.output=[length,null]
         this.offsetDegree=degree
         this.parent=parent
         this.graphics.setStrokeStyle({color:0x0000ff})
@@ -1832,12 +1947,14 @@ export class BuildingSide extends Entity{
       maxObstacles
       obstacleAmounts
       possibleRoads=[]
+      tickCounter=0
       tick(dt){
         //Happens per physics calculation
         entities.forEach(entity => {
           entity.tick(dt);
         });
         this.globalColliders=new Set()
+        this.tickCounter++
       }
       graphicsTick(){
         //Happens every frame
@@ -1946,7 +2063,8 @@ export class BuildingSide extends Entity{
                 //miktar rastgele seçiliyor ama seçilen tamamen kullanılabilmeli
                 randomAmount=remainingAmount
               }else{
-                randomAmount=Math.floor(Math.random()*(remainingAmount-1)/(1+Math.random()))+1
+                //1-4 arası sayıya bölerek aralığın altına yakın değer seçiliyor, nesne çeşitliliği artmış oluyor
+                randomAmount=Math.floor(Math.random()*(remainingAmount-1)/(1+Math.random()*3))+1
               }
               remainingAmount-=randomAmount
               remainingObstacles.splice(index,1)
@@ -1955,7 +2073,7 @@ export class BuildingSide extends Entity{
           }
         }
         //filtrelemeye ayrılan zamanı azaltmak için önceki filtreleneni filtreliyoruz
-        let lastRoads = this.possibleRoads
+        let lastRoads = shuffle(this.possibleRoads.slice(0))
         for(let i = 0;i<obstacleAmount;i++){
           //Tüm yollardan levhası olmayan engel sayısı 2'den az olanları filtreliyoruz
           //levhası olmayanlar ya levhadır ya da levhasıyla beraber gelmiyordur
@@ -1990,6 +2108,26 @@ export class BuildingSide extends Entity{
 
           }
           lastRoads=currRoads
+        }
+        if(obstacleAmount<this.maxObstacles){
+          let remaining = this.maxObstacles-obstacleAmount
+          let chosenAmount = Math.floor(Math.random()*(remaining-1))+1
+          //alttaki koşul güncellenecek, yaya geçidi olan yerlere de ışık koyulabilecek
+          let remainingRoads = lastRoads.filter(e=>this.roads[e[0]][e[1]].obstacles.length==0)
+          let toAdd = Math.min(remainingRoads.length,chosenAmount)
+          for(let i = 0;i<toAdd;i++){
+            let light = new Light(this)
+            let otherLight = new Light(this)
+            let roadIndexes = remainingRoads[i]
+            light.setRoad(roadIndexes[0],roadIndexes[1])
+            otherLight.setRoad(roadIndexes[0],roadIndexes[1])
+            otherLight.subgridIndexes=light.subgridIndexes
+            otherLight.chosenLane=light.chosenLane*-1
+            otherLight.directionOffset=90
+            otherLight.setRelativePosition()
+
+
+          }
         }
         return true
       }
