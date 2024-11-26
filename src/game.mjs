@@ -76,11 +76,24 @@ let lastUpdate = Date.now();
 const FIXED_LOOP_MS = 7;
 const FIXED_LOOP_S = FIXED_LOOP_MS / 1000;
 let accumulatedTime = 0;
+const dropdowns = document.querySelectorAll(".model select");
+dropdowns.forEach((dropdown, index) => {
+  dropdown.addEventListener("change", () => {
+    const selectedValue = dropdown.value.split("-")[0]
+    if (index === 0) {
+      mainCar.pathAlgorithm = selectedValue;
+    } else {
+      mainCar.chosenAlgorithms[index - 1] = selectedValue;
+    }
+  });
+});
+
 app.canvas.onpointerup = (e) => {
   let rect = e.target.getBoundingClientRect();
-  let scale = WIDTH / rect.width;
-  let x = (e.clientX - rect.left) * scale;
-  let y = (e.clientY - rect.top) * scale;
+  let scaleX = WIDTH / rect.width;
+  let scaleY = HEIGHT/rect.height
+  let x = (e.clientX - rect.left) * scaleX;
+  let y = (e.clientY - rect.top) * scaleY;
   if (
     mainCar.goal &&
     arrayEquals(getIndexes(mainCar.goal[0], mainCar.goal[1]), getIndexes(x, y))
