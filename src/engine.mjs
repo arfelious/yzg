@@ -85,7 +85,7 @@ const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 const ROAD_CONDITION_WEIGHTS = {
   asphalt: 0.7,
   dirt: 0.3,
-  slippery: 0
+  slippery: 0.3
 };
 const ROAD_CONDITION_ARR = ["asphalt","dirt","slippery"]
 const ROAD_CONDITION_INDEXES = {
@@ -166,7 +166,7 @@ const OBSTACLES_WITH_SIGN = Object.fromEntries(Object.keys(OBSTACLES).filter(e=>
 const OBSTACLE_IMAGES = Object.values(OBSTACLES).map(e=>e.image);
 const OBSTACLE_IMAGE_TO_NAME = Object.fromEntries(Object.entries(OBSTACLES).map(e=>[e[1].image, e[0]]));
 // Farklı uzantıları olsa bile aynı ismi birden fazla resimde kullanmamamız gerekiyor, zaten karışıklık olurdu
-const ROAD_IMAGES = ["duzyol.png", "yol1.png", "yol3.png", "dortyol.png", "toprakyol1.png", "toprakyol2.png", "toprakyol3.png", "toprakyol4.png", ];
+const ROAD_IMAGES = ["duzyol.png", "yol1.png", "yol3.png", "dortyol.png", "toprakyol1.png", "toprakyol2.png", "toprakyol3.png", "toprakyol4.png", "kayganyol1.png", "kayganyol2.png", "kayganyol3.png", "kayganyol4.png", ];
 const TYPE_TO_IMAGE = {
   asphalt: {
     straight: "duzyol.png",
@@ -179,6 +179,12 @@ const TYPE_TO_IMAGE = {
     rightcurve: "toprakyol2.png",
     3: "toprakyol3.png",
     4: "toprakyol4.png",
+  },
+  slippery: {
+    straight: "kayganyol1.png",
+    rightcurve: "kayganyol2.png",
+    3: "kayganyol3.png",
+    4: "kayganyol4.png",
   },
 };
 const LIGHT_IMAGES = ["light_r.png", "light_y.png", "light_g.png", "light_off.png", ];
