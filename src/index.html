@@ -27,19 +27,19 @@
         right: 1.5vh;
         display: grid;
         grid-template-areas:
-          ". up ."
-          "left down right";
+          'model model model'
+          '. up .'
+          'left down right';
         gap: 5px;
         justify-items: center;
       }
 
-      
       .control-button {
         width: 60px;
         height: 60px;
         background-color: rgba(0, 0, 0, 0.6);
         border: 3px solid grey;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.360);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
         color: white;
         font-size: 24px;
         border-radius: 20px;
@@ -50,9 +50,9 @@
         user-select: none;
         transition: background-color 0.3s ease, transform 0.2s ease;
       }
-      .control-button:active{
+      .control-button:active {
         background-color: rgba(3, 146, 139, 0.774);
-        transform: scale(0.98)
+        transform: scale(0.98);
       }
 
       #control-up {
@@ -70,10 +70,9 @@
 
       /* ------------------------------------------------------ */
 
-      
       #control-brake-container {
         position: absolute;
-        bottom: 10vh; 
+        bottom: 10vh;
         right: 1.5vh;
         display: flex;
         justify-content: center;
@@ -85,7 +84,7 @@
         height: 60px;
         background-color: rgba(0, 0, 0, 0.6);
         border: 5px solid grey;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.360);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -93,12 +92,18 @@
         cursor: pointer;
         transition: background-color 0.3s ease, transform 0.2s ease;
       }
-      #control-brake:active{
+      #control-brake:active {
         background-color: rgba(3, 146, 139, 0.774);
-        transform: scale(0.98)
+        transform: scale(0.98);
       }
 
       /* ------------------------------------------------------ */
+
+      .model {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
 
       @media (max-width: 767px) {
         #game {
@@ -111,15 +116,14 @@
           position: absolute;
           bottom: 15%;
           left: 50%;
-          transform: translateX(-55%); 
+          transform: translateX(-55%);
         }
 
-        
         #control-brake-container {
           position: absolute;
           bottom: 5%;
           left: 50%;
-          transform: translateX(-50%); 
+          transform: translateX(-50%);
         }
       }
     </style>
@@ -128,21 +132,42 @@
   <body>
     <div id="game"></div>
 
-    
     <div id="control-container">
+      <div class="model" style="grid-area: model">
+        <select>
+          <option value="DFS">DFS</option>
+          <option value="A*">A*</option>
+          <option value="UCS">UCS</option>
+        </select>
+        <select>
+          <option value="rule-based">Rule Based</option>
+          <option value="NN">NN</option>
+        </select>
+        <select>
+          <option value="rule-based">Rule Based</option>
+          <option value="NN">NN</option>
+        </select>
+        <select>
+          <option value="rule-based">Rule Based</option>
+          <option value="NN">NN</option>
+        </select>
+      </div>
+
       <div id="control-left" class="control-button">A</div>
       <div id="control-up" class="control-button">W</div>
       <div id="control-right" class="control-button">D</div>
       <div id="control-down" class="control-button">S</div>
     </div>
 
-    
     <div id="control-brake-container">
       <div id="control-brake">
-        <img src="/assets/space-icon.png" alt="Space" style="width: 150px; height: 30px;" />
+        <img
+          src="/assets/space-icon.png"
+          alt="Space"
+          style="width: 150px; height: 30px"
+        />
       </div>
     </div>
-    
 
     <script src="../modules/pixi.js"></script>
     <script src="../modules/tf.min.js"></script>
