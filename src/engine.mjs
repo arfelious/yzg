@@ -2471,9 +2471,11 @@ export class Game {
   wandererAmount = 4;
   wanderers;
   resolveCollision=false
-  createWanderer() {
+  createWanderer(fromEdge) {
     let wanderer = new Car(this, "temp_car");
-    let road = shuffle(this.possibleRoads.slice(0))[0];
+    let possibleRoads = fromEdge?this.possibleRoads.filter(e=>e[0]==0||e[0]==GRID_WIDTH-1||e[1]==0||e[1]==GRID_HEIGHT-1):
+      this.possibleRoads.slice(0)
+    let road = shuffle(possibleRoads)[0];
     road = this.roads[road[0]][road[1]];
     wanderer.setPosition(road.posX, road.posY);
     wanderer.direction = connectionLookup[shuffle(getConnections(road.roadType, road._direction))[0]] * 90;
@@ -2481,7 +2483,7 @@ export class Game {
     wanderer.onIndexChange.push(() => {
       if (!inBounds(wanderer.gridIndexes)) {
         wanderer.destroy()
-        this.createWanderer();
+        this.createWanderer(true);
       }
     });
   }
