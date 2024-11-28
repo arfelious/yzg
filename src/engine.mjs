@@ -1566,6 +1566,10 @@ export class Car extends MovableEntity {
   _getGoalAction(dt) {
     if (!this.path || this.path.length == 0) return this.isWandering
     let currGoal = this.path[1] || this.path[0];
+    if(!arrayEquals(this.path[0],this.gridIndexes)){
+      this.resetPath()
+    }
+    if (!this.path || this.path.length == 0) return this.isWandering
     //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
     let facingDirection = this.getFacingDirection()
     let relativeDirection = this.path.length==1?facingDirection:getRelativeDirection(this.gridIndexes, currGoal);
@@ -1574,16 +1578,18 @@ export class Car extends MovableEntity {
     //normalde willTurn'ün belli dönüşlerde sağ şeridi zorunlu kılması lazım ama zaten getThreatAction ve getRuleAction dışında araç sol şeride geçemez
     //onlarda da kod buraya gelemez
     let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
-    console.log(willTurn,this.laneMultiplier,currentMultiplier)
-    //bu 20 değeri, sol şeride normalde sağ şeride gittiğinin yarısı miktarda gitmesi gerektiğini belirtiyor
+    //bu 100 değeri, sol şeride normalde sağ şeride gittiğinin 10'da biri miktarda gitmesi gerektiğini belirtiyor
     //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
-    let currentDivider = currentMultiplier==-1?20:10
+    let currentDivider = currentMultiplier==-1?15:10
     let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
     let dy = targetY - this.posY;
     // Hedefe doğru açıyı hesapla
     let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
-    let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
+    let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
+    if (angleDifference > 180) {
+        angleDifference -= 360;
+    }
     // Yön ayarlaması yap
     if (angleDifference > 3) {
       this.steerRight(dt);
