@@ -1567,11 +1567,18 @@ export class Car extends MovableEntity {
     if (!this.path || this.path.length == 0) return this.isWandering
     let currGoal = this.path[1] || this.path[0];
     //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
-    let relativeDirection = this.path.length>0?this.getFacingDirection():getRelativeDirection(this.gridIndexes, currGoal);
-    //dönecekse -1
-    let willTurn = this.path.length > 2 && getRelativeDirection(this.path[2], this.path[1]) == this.getFacingDirection() ? -1 : 1;
-    let currentMultiplier = willTurn==-1?willTurn:this.laneMultiplier
-    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, 10);
+    let facingDirection = this.getFacingDirection()
+    let relativeDirection = this.path.length==1?facingDirection:getRelativeDirection(this.gridIndexes, currGoal);
+    let nextDirection = this.path.length > 2 && getRelativeDirection(this.path[2], this.path[1])
+    let willTurn = nextDirection != facingDirection ? -1 : 1;
+    //normalde willTurn'ün belli dönüşlerde sağ şeridi zorunlu kılması lazım ama zaten getThreatAction ve getRuleAction dışında araç sol şeride geçemez
+    //onlarda da kod buraya gelemez
+    let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
+    console.log(willTurn,this.laneMultiplier,currentMultiplier)
+    //bu 20 değeri, sol şeride normalde sağ şeride gittiğinin yarısı miktarda gitmesi gerektiğini belirtiyor
+    //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
+    let currentDivider = currentMultiplier==-1?20:10
+    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
     let dy = targetY - this.posY;
     // Hedefe doğru açıyı hesapla
