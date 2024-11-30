@@ -1,28 +1,31 @@
 /*
+    PRIORITY:
+          model
+          şerit takip düzeltme
+          nesnelerin levhaları beraberinde eklenmeli
+          ışıklar mantıklı hale getirilecek
+          collision resolution
     TODO:
           GENEL OPTİMİZASYON
+          binalar için random resim
+          doğru trafik ışığı resmi
           doğru grid'de olanların filtrelenmesi yerine her tick sonunda nesneler kendilerini o grid'e ekleyecek, collision kontrolü ona göre olacak
           levhaların türü farklı olabilir, collision olarak algılanmamaları daha iyi olabilir
           giriş menüsü, start ve test kısmı
           yol bulma algoritmaları için test verisi eklenmeli
           kavisli yolda bakılan yön yanlış mı test edilecek
-          ışıklar mantıklı hale getirilecek
           rightcurve için engeller sınırlanmalı
           okyanus dibindeki yollara random kum veya beton, collision gerekmeyeceği için childGraphics kullanılabilir
           engellerin bulunabileceği yol türleri düzgün ayarlanmalı
-          nesnelerin levhaları beraberinde eklenmeli
-          nesnelerin boyutları ve yolda hizalanmaları ayarlanmalı
+          engellerin boyutları ve yolda hizalanmaları ayarlanmalı
           setMapExtras kod tekrarı düşürülecek
           kural tabanlı otonomun şerit kontrolü iyileştirilmeli
-          private olması gereken property ve method'lar private yapılacak (örn. setPosition yerine #setPosition)
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
           collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
           road class'ı için getLines fonksiyonundaki kod tekrarı verimlilik düşürülmeden azaltılacak
-          aracın oluşturduğu çizgi hesaplanırken getFrontLine tüm çizgileri hesaplatıyor, ayrı olarak hesaplanması daha iyi olur
           yol bulucunun çizdiği yolun sonuna görünürlüğü arttırmak amacıyla daire eklenecek
           findPath memoization
           trafik işaretleri, engeller ve farklı araçlar eklenmeli
-          collision resolution
       MAYBE:
         budama
         model basıyor olsa da basılan butonlar WASD kısmında gösterilmeli
@@ -608,7 +611,7 @@ let getCosts = (grid, curr = getStartPoint(grid), visitedObj, consecutiveRoadTyp
     let currValue = visitedObj[e[0]][e[1]];
     let currCounter = currValue ? currValue[0] : 0;
     if (consecutiveAmount > currCounter) {
-      let currCost = getConnectedEdge(consecutiveRoadType,consecutiveAmount,ROAD_CONDITION_ARR[grid[e[0]][e[1]][2]])
+      let currCost = getCost(consecutiveRoadType,consecutiveAmount,ROAD_CONDITION_ARR[grid[e[0]][e[1]][2]])
       visitedObj[e[0]][e[1]] = [consecutiveAmount, currCost];
     }
   }
@@ -1335,6 +1338,7 @@ export class MovableEntity extends Entity {
   entitySteeringMultiplier = STEERING_MULTIPLIER;
   entityMinAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
+  entityMoveLimiter=1
   chosenAlgorithms = ["rule", "rule", "rule"];
   tick(dt) {
     this.velX += this.accX * dt;
@@ -1517,6 +1521,9 @@ export class Car extends MovableEntity {
     }
   }
   lastActionType=null
+  resetMoveLimiter(){
+    this.entityMoveLimiter=1
+  }
   getAction() {
     let threatAction = this.getThreatAction(this.chosenAlgorithms[0]);
     if (threatAction !== null) {
@@ -1528,6 +1535,8 @@ export class Car extends MovableEntity {
       this.lastActionType="rule"
       return ruleAction;
     }
+    //kurallar ve tehditler hızı sınırlayabiliyor, o sınır kaldırılıyor
+    this.resetMoveLimiter()
     let goalAction = this.getGoalAction(this.chosenAlgorithms[2]);
     if (goalAction !== null){
       this.lastActionType="goal"
@@ -1557,16 +1566,30 @@ export class Car extends MovableEntity {
   _getGoalAction(dt) {
     if (!this.path || this.path.length == 0) return this.isWandering
     let currGoal = this.path[1] || this.path[0];
+    if(!arrayEquals(this.path[0],this.gridIndexes)){
+      this.resetPath()
+    }
+    if (!this.path || this.path.length == 0) return this.isWandering
     //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
-    let relativeDirection = getRelativeDirection(this.path.length > 1 ? this.path[0] : this.gridIndexes, currGoal);
-    //dönecekse -1
-    let willTurn = this.path.length > 1 && getRelativeDirection(this.path[0], this.path[1]) == this.getFacingDirection() ? -1 : 1;
-    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, this.laneMultiplier * willTurn, 10);
+    let facingDirection = this.getFacingDirection()
+    let relativeDirection = this.path.length==1?facingDirection:getRelativeDirection(this.gridIndexes, currGoal);
+    let nextDirection = this.path.length > 2 && getRelativeDirection(this.path[2], this.path[1])
+    let willTurn = nextDirection != facingDirection ? -1 : 1;
+    //normalde willTurn'ün belli dönüşlerde sağ şeridi zorunlu kılması lazım ama zaten getThreatAction ve getRuleAction dışında araç sol şeride geçemez
+    //onlarda da kod buraya gelemez
+    let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
+    //bu 100 değeri, sol şeride normalde sağ şeride gittiğinin 10'da biri miktarda gitmesi gerektiğini belirtiyor
+    //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
+    let currentDivider = currentMultiplier==-1?15:10
+    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
     let dy = targetY - this.posY;
     // Hedefe doğru açıyı hesapla
     let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
-    let angleDifference = ((angleToTarget - this._direction + 540) % 360) - 180; // Hedefe doğru açısal fark
+    let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
+    if (angleDifference > 180) {
+        angleDifference -= 360;
+    }
     // Yön ayarlaması yap
     if (angleDifference > 3) {
       this.steerRight(dt);
@@ -1677,8 +1700,8 @@ export class Car extends MovableEntity {
   accelerate(dt = 1, scale = 1) {
     let degree = this._direction;
     let radian = toRadian(degree);
-    this.accX += Math.cos(radian) * this.entityMoveMultiplier * scale * dt;
-    this.accY += Math.sin(radian) * this.entityMoveMultiplier * scale * dt;
+    this.accX += Math.cos(radian) * this.entityMoveMultiplier*this.entityMoveLimiter * scale * dt;
+    this.accY += Math.sin(radian) * this.entityMoveMultiplier*this.entityMoveLimiter * scale * dt;
   }
   moveForward(dt = 1, scale = 1) {
     // scale 0-1.0 arasında, ivmelenme kontrolünde lazım olacak
