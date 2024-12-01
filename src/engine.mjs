@@ -1505,8 +1505,8 @@ export class Car extends MovableEntity {
   switchLane() {
     this.laneMultiplier *= -1;
   }
-  addSensor(degree, lengthMultiplier = 1, xOffset = 0) {
-    let sensor = new Sensor(this.game, degree, this, lengthMultiplier * CAR_WIDTH, xOffset);
+  addSensor(degree, lengthMultiplier = 1, xOffset = 0, yOffset = 0) {
+    let sensor = new Sensor(this.game, degree, this, lengthMultiplier * CAR_WIDTH, xOffset, yOffset);
     this.childContainer.addChild(sensor.graphics);
     this.sensors.push(sensor);
   }
@@ -2581,9 +2581,10 @@ export class Sensor extends MovableEntity {
     }
     this.currentGrids = this.getGrids();
   };
-  constructor(game, degree, parent, length = CAR_WIDTH, xOffset = 0) {
+  constructor(game, degree, parent, length = CAR_WIDTH, xOffset = 0, yOffset = 0) {
     super(game);
     this.xOffset = xOffset;
+    this.yOffset = yOffset
     this.entityType = "sensor";
     this.length = length;
     this.lineLength = length;
