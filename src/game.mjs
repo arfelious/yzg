@@ -12,7 +12,7 @@ import {
 } from "../src/engine.mjs";
 
 let game = new Game(app.stage);
-game.setWanderers()
+//game.setWanderers()
 let currentStart =
   game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
