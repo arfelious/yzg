@@ -40,7 +40,7 @@ export const DRAG = 4.4; // increases drag when increased
 export const TURN_DRAG = 1.2;
 export const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
 export const STEERING_MULTIPLIER = 1.6;
-export const min_ALIGNMENT = 0.7;
+export const MIN_ALIGNMENT = 0.7;
 export const PATH_START_INDEX = 2;
 export const BUILDING_MULTIPLIER = 0.9;
 export const LIGHT_CHANGE_TICK = 700;
@@ -1396,7 +1396,7 @@ export class MovableEntity extends Entity {
   entityDrag = DRAG;
   entityTurnDrag = TURN_DRAG;
   entitySteeringMultiplier = STEERING_MULTIPLIER;
-  entityminAlignment = min_ALIGNMENT;
+  entityminAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
   entityMoveLimiter=1
   chosenAlgorithms = ["rule", "rule", "rule"];
