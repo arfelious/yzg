@@ -12,7 +12,7 @@ import {
 } from "../src/engine.mjs";
 
 let game = new Game(app.stage);
-//game.setWanderers()
+game.setWanderers()
 let currentStart =
   game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
@@ -129,8 +129,19 @@ let updateLoop = () => {
   lastUpdate = now;
 };
 setInterval(updateLoop, FIXED_LOOP_MS);
+let scaleColor = (color, brightness)=>{
+  let r = ((color >> 16) & 0xFF) * brightness;
+  let g = ((color >> 8) & 0xFF) * brightness;
+  let b = (color & 0xFF) * brightness;
+  return ((r << 16) | (g << 8) | b) & 0xFFFFFF;
+}
 ticker.add((dt) => {
   game.graphicsTick();
+  const baseColor = 0xaaaaaa;
+  const cycleSpeed = 0.01;
+  const brightness = 0.5 + 0.5 * Math.sin(game.tickCounter * cycleSpeed);
+  //const tintedColor = scaleColor(baseColor, brightness);
+  //app.stage.tint = 0x555555+tintedColor;
   frameTimes.push(Date.now());
 });
 // FPS Sayacı

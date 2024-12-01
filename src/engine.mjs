@@ -32,8 +32,10 @@
 // Sabitler
 export const WIDTH = 1200;
 export const HEIGHT = 900;
-export const CAR_WIDTH = 48;
 export const ROAD_WIDTH = 150;
+export const GRID_WIDTH = WIDTH / ROAD_WIDTH;
+export const GRID_HEIGHT = HEIGHT / ROAD_WIDTH;
+export const CAR_WIDTH = 48;
 export const DRAG = 4.4; // increases drag when increased
 export const TURN_DRAG = 1.2;
 export const MOVE_MULTIPLIER = 100; // acceleration, should be increased when drag is increased
@@ -404,7 +406,7 @@ let getNeighbours = (point) => [
   [point[0], point[1] + 1],
   [point[0] - 1, point[1]],
 ];
-let createMap = (grid, curr, fromDirection,lastCondition,recursionCounter=0) => {
+export let createMap = (grid, curr, fromDirection,lastCondition,recursionCounter=0) => {
   //recursiounCounter sadece ana yolda sapan oluşturucuları sayıyor, sayının çift olup olmadığına göre ışıklar belirleniyor
   let firstInsert = !grid;
   if (firstInsert) {
@@ -686,7 +688,7 @@ let getCosts = (grid, curr = getStartPoint(grid), visitedObj, consecutiveRoadTyp
   }
   return visitedObj;
 };
-let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getminimumDistance = false, forceInitialDirection, visited, visitedObj, lastDirection = forceInitialDirection) => {
+export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getminimumDistance = false, forceInitialDirection, visited, visitedObj, lastDirection = forceInitialDirection) => {
   switch (pathAlgorithm) {
     case "A*": {
       const openSet = [
@@ -892,11 +894,7 @@ let noop = () => {};
 document.body.appendChild(app.canvas);
 app.canvas.style = "";
 app.canvas.id = "game";
-const GRID_WIDTH = WIDTH / ROAD_WIDTH;
-const GRID_HEIGHT = HEIGHT / ROAD_WIDTH;
 let entities = [];
-window.GRID_WIDTH = GRID_WIDTH;
-window.GRID_HEIGHT = GRID_HEIGHT;
 window.entities = entities;
 let cars = [];
 let toRadian = (x) => (x / 180) * Math.PI;
