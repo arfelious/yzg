@@ -29,7 +29,7 @@
 <h4>Yusuf Baran Korkmaz ❌</h4>
 <h4>Sibel Genç ❌</h4>
 <h4>Kaan Biber ❌</h4>
-<h4>Ahsen Ela Akgün ❌</h4>
+<h4>Ahsen Ela Akgün ✅</h4>
 </div>
 <hr/>
 
