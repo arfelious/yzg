@@ -7,6 +7,7 @@
           problemAmount kullanılacak, game içine kaydedilecek
     TODO:
           GENEL OPTİMİZASYON
+          bir yola aynı levhadan iki tane koyulmayacak
           komşu subgrid'lere ışık gelebilip gelemediği test edilecek
           shuffle kullanan yerler optimize edilecek
           doğru grid'de olanların filtrelenmesi yerine her tick sonunda nesneler kendilerini o grid'e ekleyecek, collision kontrolü ona göre olacak
@@ -231,13 +232,14 @@ const LIGHT_IMAGES = ["k-ısık.png", "s-ısık.png", "y-ısık.png", "kapalı_�
 const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e, i) => [e, i]));
 const BUILDING_TOPS = ["bina_test.png"]
 const BUILDING_SIDES = ["bina_yan.png","bina1.png"]
-let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS];
+let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS];
 //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
 let intendedWidths = {
   "temp_car.png": [CAR_WIDTH, true],
   "ocean.jpeg": [ROAD_WIDTH],
   "park alanı.jpg": [ROAD_WIDTH],
   "cim.jpg": [ROAD_WIDTH],
+  "sand.png": [ROAD_WIDTH/4],
 };
 //tüm engel ve yol resimleri için resimler ölçeklenecek
 let toScale = [...ROAD_IMAGES.map(e=>[e, false]),
@@ -314,10 +316,17 @@ let getSubgridIndex = (angle,magnitude=1) => {
     Math.round(magnitude*Math.cos(toRadian(angle))),
   ];
 };
-let getAbsoluteSubgridIndex = (absIndex, offsetAngle) => {
+let getAbsoluteIndexNoRound = (angle,magnitude=1)=>{
+  return [
+    magnitude*Math.sin(toRadian(angle)),
+    magnitude*Math.cos(toRadian(angle)),
+  ];
+}
+let getAbsoluteSubgridIndex = (absIndex, offsetAngle,noRound=false) => {
   if (absIndex[0] == 0 && absIndex[1] == 0) return absIndex;
   let currAngle = getSubgridAngle(absIndex);
   let magnitude = getMagnitude(absIndex[0],absIndex[1])
+  if(noRound)return getAbsoluteIndexNoRound(currAngle + offsetAngle,magnitude)
   return getSubgridIndex(currAngle + offsetAngle,magnitude);
 };
 let getRandom = arr=>arr[Math.floor(Math.random()*arr.length)]
@@ -405,6 +414,12 @@ let getNeighbours = (point) => [
   [point[0] + 1, point[1]],
   [point[0], point[1] + 1],
   [point[0] - 1, point[1]],
+];
+let getCrossNeighbours = (point) => [
+  [point[0]-1, point[1] - 1],
+  [point[0] + 1, point[1]+1],
+  [point[0]+1, point[1] + 1],
+  [point[0] - 1, point[1]-1],
 ];
 export let createMap = (grid, curr, fromDirection,lastCondition,recursionCounter=0) => {
   //recursiounCounter sadece ana yolda sapan oluşturucuları sayıyor, sayının çift olup olmadığına göre ışıklar belirleniyor
@@ -1119,6 +1134,11 @@ class Entity {
   redrawNecessary = true;
   mass=null
   massMultiplier=1
+  subgridEntities=[]
+  isChild=false
+  setSand(subgridX,subgridY,oceanIndex,isSmall=false){
+    let sand = new Sand(this.game,this,[subgridX,subgridY],oceanIndex,isSmall)
+  }
   getGrids() {
     //Array'de olup olmadığının hızlı anlaşılması için string olarak tutulması gerekiyor
     let lines = this.getLines();
@@ -1215,6 +1235,7 @@ class Entity {
       this.bounds[3][1] - this.bounds[0][1] + 1,
     ].map(e=>e * this.scale);
     app.stage.addChild(this.childContainer);
+    this.childContainer.zIndex=this.zIndex+1
     if (this.createGraphics) {
       this.graphics = new PIXI.Graphics();
       this.graphics.zIndex = 1;
@@ -1328,7 +1349,7 @@ class Entity {
       this.spriteCache[currSpritePath] = sprite;
     }
     this.init(sprite);
-    app.stage.addChild(sprite);
+    if(!this.isChild)app.stage.addChild(sprite);
     sprite.zIndex = this.zIndex;
   }
   // Hız büyüklüğünü hesaplayan fonksiyon
@@ -1386,6 +1407,44 @@ class Entity {
   constructor(game) {
     entities.push(this);
     this.game = game;
+  }
+}
+export class Sand extends Entity{
+  anchorX=0.5
+  anchorY=0.5
+  isChild=true
+  zIndex=3
+  parent;
+  subgridIndexes
+  constructor(game,parent,subgrid,oceanIndex,isSmall=false){
+    super(game)
+    this.parent=parent
+    let relativeSubgrid = getAbsoluteSubgridIndex(subgrid,this.parent._direction,true)
+    let subgridWidth = ROAD_WIDTH/3
+    let smallSideWidth = ROAD_WIDTH/4
+    let sizeDiff = subgridWidth-smallSideWidth
+    let parentIndexes = this.parent.gridIndexes
+    let oceanAngle = getSubgridAngle([oceanIndex[0]-parentIndexes[0],oceanIndex[1]-parentIndexes[1]])
+    this.width=!isSmall&&oceanAngle%90==0?subgridWidth:smallSideWidth
+    this.height=isSmall||this.width==subgridWidth?smallSideWidth:subgridWidth
+    if(isSmall){
+      //TODO: gerçek offset bulunacak. şu anki değerlerin matematiksel anlamı çok yok
+      this.width+=Math.floor(sizeDiff/2/Math.sqrt(2)) 
+      this.height+=Math.floor(sizeDiff/2/Math.sqrt(2))
+    }
+    this.sprite="sand"
+    this.parent.childContainer.addChild(this.sprite)
+    let positionX = relativeSubgrid[0]*subgridWidth
+    let positionY = relativeSubgrid[1]*subgridWidth
+    let angleToUse = oceanAngle-parent._direction
+    let angleForVector = -(oceanAngle+parent._direction-90)
+    let angleVector = toVector(angleForVector)
+    positionX+=sizeDiff*angleVector[0]
+    positionY+=sizeDiff*angleVector[1]
+    this.setPosition(positionX,positionY)
+    this.subgridIndexes=relativeSubgrid
+    this.direction=angleToUse
+    this.parent.subgridEntities.push([this.subgridIndexes,this])
   }
 }
 export class MovableEntity extends Entity {
@@ -1648,6 +1707,7 @@ export class Car extends MovableEntity {
     //yukarı giderken sağa dönecekse, sağa giderken aşağı dönecekse vs. geniş alması gerekiyor, bu örüntü her zaman connection arrayinde 1 fark oluşturuyor
     let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
     //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
+    this.sprite.tint===-1?0x00ff00:0xffffff
     let currentDivider = currentMultiplier==-1?15:10
     let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
@@ -2858,6 +2918,32 @@ export class Game {
         filled[e.join(",")] = true;
         let [i, j] = e;
         currOcean.setPosition(ROAD_WIDTH * (i + 1), ROAD_WIDTH * j);
+        let index = e
+        let rawNeighbours = getNeighbours(index).map(e=>this.roads[e[0]]?.[e[1]])
+        for(let i = 0;i<4;i++){
+          let currentCouple = [rawNeighbours[i],rawNeighbours[(i+1)%4]]
+          if(currentCouple[0]&&currentCouple[1]){
+            let coupleIndexes = currentCouple.map(e=>e.gridIndexes)
+            let currIndexX = coupleIndexes[0][0]==index[0]?coupleIndexes[1][0]:coupleIndexes[0][0]
+            let currIndexY = coupleIndexes[0][1]==index[1]?coupleIndexes[1][1]:coupleIndexes[0][1]
+            let roadIndex = [currIndexX,currIndexY]
+            let road = this.roads[currIndexX]?.[currIndexY]
+            if(!road)continue
+            let angle = getSubgridAngle([roadIndex[0]-index[0],roadIndex[1]-index[1]])
+            let absolute = getAbsoluteSubgridIndex([0,-1.8],angle,true)
+            road.setSand(absolute[0],absolute[1],index,true)
+          }
+        }
+        let neighbours = rawNeighbours.filter(e=>e)
+        neighbours.filter(e=>e.entityType=="road").forEach(road=>{
+          let roadIndex = road.gridIndexes
+          let relativeDirection = getRelativeDirection(index,roadIndex)
+          let angle = -connectionLookup[relativeDirection]*90;
+          let absolute = [[-1,-1],[0,-1],[1,-1]].map(e=>getAbsoluteSubgridIndex(e,angle))
+          absolute.forEach(subgridIndex=>{
+            road.setSand(subgridIndex[0],subgridIndex[1],index)
+          })
+        })
       });
     }
     let fillers = [Building, Park];
@@ -3043,8 +3129,8 @@ export class Game {
     this.obstacleAmounts = obstacleAmounts;
     this.stage = stage;
     this.setMap();
-    this.fillEmpty();
     this.setRoads();
+    this.fillEmpty();
     this.setMapExtras(onlySpecified);
   }
 }
