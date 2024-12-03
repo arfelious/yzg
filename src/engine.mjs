@@ -137,6 +137,7 @@ const OBSTACLES = {
     isOnRoad: false,
     roadTypes: withoutCurve,
     width: CAR_WIDTH*2/3,
+    width: CAR_WIDTH*2/3,
     image: "bariyerLevha.png",
     useWidthAsHeight: false,
     lanes: 1,
