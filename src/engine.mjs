@@ -3258,7 +3258,7 @@ export class Game {
     }
     entities.forEach(e=>e.destroy());
   }
-  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 20, minObstacles = 10) {
+  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 30, minObstacles = 20) {
     this.minObstacles = minObstacles;
     this.maxObstacles = maxObstacles;
     this.obstacleAmounts = obstacleAmounts;
