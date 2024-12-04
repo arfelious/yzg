@@ -84,6 +84,7 @@ let changeImageResolution = async (texture, options) => {
     };
   });
 };
+const THREATS = ["rogar","bariyer","cukur","car"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
 const ROAD_CONDITION_WEIGHTS = {
@@ -102,7 +103,7 @@ const OBSTACLES = {
   rogar: {
     isOnRoad: true,
     roadTypes: withoutCurve,
-    width: CAR_WIDTH * 2,
+    width: CAR_WIDTH * 3/2,
     image: "rogarKapagi.png",
     useWidthAsHeight: true,
     isRotated: true,
@@ -135,18 +136,8 @@ const OBSTACLES = {
   bariyerLevha: {
     isOnRoad: false,
     roadTypes: withoutCurve,
-    width: CAR_WIDTH,
+    width: CAR_WIDTH*2/3,
     image: "bariyerLevha.png",
-    useWidthAsHeight: false,
-    lanes: 1,
-    roadCondition:"dirt",
-    roadConditionInverted:true
-  },
-  stopLevha: {
-    isOnRoad: false,
-    roadTypes: ["3", "4"],
-    width: (CAR_WIDTH * 2) / 3,
-    image: "lvh.png",
     useWidthAsHeight: false,
     lanes: 1,
     roadCondition:"dirt",
@@ -230,7 +221,7 @@ const TYPE_TO_IMAGE = {
 const ROAD_IMAGES = Object.values(TYPE_TO_IMAGE).map(e=>Object.values(e)).flat()
 const LIGHT_IMAGES = ["k-ısık.png", "s-ısık.png", "y-ısık.png", "kapalı_ısık.png"];
 const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e, i) => [e, i]));
-const BUILDING_TOPS = ["bina_test.png"]
+const BUILDING_TOPS = ["bina_test.png","cati1.png"]
 const BUILDING_SIDES = ["bina_yan.png","bina1.png"]
 let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS];
 //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
@@ -274,14 +265,14 @@ const LINE_AMOUNTS = {
   3: 5,
   rightcurve: 10,
 };
-const ROAD_WEIGHTS = {
+const CHANCE_ROAD_WEIGHTS = {
   3: 0.5,
   4: 0.5,
 };
 const LIGHT_STATES = ["RED", "YELLOW", "GREEN"];
 let startTime = Date.now();
 let getRoadWeight = (roadType) => {
-  return ROAD_WEIGHTS[roadType] || 1;
+  return CHANCE_ROAD_WEIGHTS[roadType] || 1;
 };
 let getWeightedRandom = (obj) => {
   let sum = 0;
@@ -414,12 +405,6 @@ let getNeighbours = (point) => [
   [point[0] + 1, point[1]],
   [point[0], point[1] + 1],
   [point[0] - 1, point[1]],
-];
-let getCrossNeighbours = (point) => [
-  [point[0]-1, point[1] - 1],
-  [point[0] + 1, point[1]+1],
-  [point[0]+1, point[1] + 1],
-  [point[0] - 1, point[1]-1],
 ];
 export let createMap = (grid, curr, fromDirection,lastCondition,recursionCounter=0) => {
   //recursiounCounter sadece ana yolda sapan oluşturucuları sayıyor, sayının çift olup olmadığına göre ışıklar belirleniyor
@@ -703,7 +688,7 @@ let getCosts = (grid, curr = getStartPoint(grid), visitedObj, consecutiveRoadTyp
   }
   return visitedObj;
 };
-export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getminimumDistance = false, forceInitialDirection, visited, visitedObj, lastDirection = forceInitialDirection) => {
+export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getMinimumDistance = false, forceInitialDirection, visited, visitedObj, lastDirection = forceInitialDirection) => {
   switch (pathAlgorithm) {
     case "A*": {
       const openSet = [
@@ -869,9 +854,9 @@ export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getminim
       for (let i = 0; i < leftConnections.length; i++) {
         let curr = leftConnections[i];
         let direction = directionsAndConnections[i][0];
-        let tempRes = findPath(grid, null, curr, road2Indexes, getminimumDistance, null, visited.map(e=>e), copyVisitedObj(visitedObj), direction);
+        let tempRes = findPath(grid, null, curr, road2Indexes, getMinimumDistance, null, visited.map(e=>e), copyVisitedObj(visitedObj), direction);
         if (tempRes) {
-          if (!getminimumDistance) return tempRes;
+          if (!getMinimumDistance) return tempRes;
           let tempLength = tempRes.length;
           if (tempLength < currminimumLength) {
             currminimumLength = tempLength;
@@ -883,14 +868,14 @@ export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getminim
     }
   }
 };
-let findPathTo = function(x, y, getminimumDistance, forceInitialDirection) {
+let findPathTo = function(x, y, getMinimumDistance, forceInitialDirection) {
   let gridIndexes = getIndexes(x, y);
   let [gridX, gridY] = gridIndexes;
   let gridElement = this.game.map[gridX][gridY];
   let currIndexes = getIndexes(this.posX, this.posY);
   if (!gridElement || gridElement[0] == -1) return false;
   if (gridX == currIndexes[0] && gridY == currIndexes[1]) return false;
-  let res = findPath(this.game.map, this.pathAlgorithm, currIndexes, gridIndexes, getminimumDistance, forceInitialDirection);
+  let res = findPath(this.game.map, this.pathAlgorithm, currIndexes, gridIndexes, getMinimumDistance, forceInitialDirection);
   return res;
 };
 let imagePaths = {};
@@ -911,7 +896,6 @@ app.canvas.style = "";
 app.canvas.id = "game";
 let entities = [];
 window.entities = entities;
-let cars = [];
 let toRadian = (x) => (x / 180) * Math.PI;
 let getMagnitude = Math.hypot;
 let toVector = (x) => [Math.cos(toRadian(x)), Math.sin(toRadian(x))];
@@ -991,6 +975,7 @@ export let getIndexes = (x, y, anchorDiffX = 0, anchorDiffY = anchorDiffX) => [
 export let getCoordinates = (x, y) => {
   return [(x + 0.5) * ROAD_WIDTH, (y + 0.5) * ROAD_WIDTH];
 };
+let getDistance = (x,y)=>getMagnitude(x[0]-y[0],x[1]-y[1])
 let toDegree = (x) => (x / Math.PI) * 180;
 let getBounds = (sprite) => {
   let extracted = app.renderer.extract.pixels(sprite);
@@ -1033,7 +1018,6 @@ let getAbsoluteBounds = (entity)=>{
   let anchorOffsetX = width * anchorX;
   let anchorOffsetY = height * anchorY;
   return bounds.map(([relX, relY]) => {
-      //TODO: bu hesap birkaç yerde daha gerekti fonksiyona çevrilebilir
       let offsetX = relX - anchorOffsetX;
       let offsetY = relY - anchorOffsetY;
       let rotatedX = Math.cos(direction) * offsetX - Math.sin(direction) * offsetY;
@@ -1235,7 +1219,7 @@ class Entity {
       this.bounds[3][1] - this.bounds[0][1] + 1,
     ].map(e=>e * this.scale);
     app.stage.addChild(this.childContainer);
-    this.childContainer.zIndex=this.zIndex+1
+    if(this.width==ROAD_WIDTH)this.childContainer.zIndex=this.zIndex+1
     if (this.createGraphics) {
       this.graphics = new PIXI.Graphics();
       this.graphics.zIndex = 1;
@@ -1255,8 +1239,7 @@ class Entity {
     }
   }
   a = 0;
-  getLines() {
-    if (this.cachedLines) return this.cachedLines;
+  getSurroundingLines(){
     /*
           A----B
           |    |
@@ -1288,7 +1271,11 @@ class Entity {
     let CD = [C, D];
     let DA = [D, A];
     this.shouldDraw = true;
-    return this.cachedLines = [AB, BC, CD, DA];
+    return [AB, BC, CD, DA];
+  }
+  getLines() {
+    if (this.cachedLines) return this.cachedLines;
+    return this.cachedLines = this.getSurroundingLines()
   }
   setGraphics() {
     if (this.shouldDraw) {
@@ -1509,7 +1496,12 @@ export class MovableEntity extends Entity {
       }
       if (this.lastAction) {
         let updateAction = this.lastAction(dt);
-        if (updateAction) this.lastAction = this.getAction;
+        if (updateAction&&this.lastActionType!="goal"){
+          let goalAction = this.getGoalAction(this.chosenAlgorithms[2])
+          if(goalAction)goalAction.call(this,dt)
+          let nextAction = this.getAction()
+          this.lastAction=nextAction??this.lastAction
+        }
       }
     }
     let nextColliders = this.getColliders();
@@ -1549,6 +1541,10 @@ export class Car extends MovableEntity {
   lastIsTurning = false;
   lastIsUsingBrake = false;
   massMultiplier=10
+  isAccelerating=false
+  lastPath
+  allowSteer=false
+  isOverriden=false
   set isWandering(value) {
     this._isWandering = value;
   }
@@ -1572,6 +1568,12 @@ export class Car extends MovableEntity {
   setPosition(x,y){
     super.setPosition(x,y)
 
+  }
+  isOnCorrectLane() {
+    let laneOffset = getLaneOffset(this.getFacingDirection(), this.laneMultiplier, 20); 
+    let nonZeroAxis = laneOffset[0] === 0 ? 1 : 0; 
+    let axisDifference = this[nonZeroAxis==0?"posX":"posY"] - this.currentRoad[nonZeroAxis==0?"posX":"posY"];
+    return Math.sign(axisDifference) === Math.sign(laneOffset[nonZeroAxis]) && Math.abs(axisDifference) > Math.abs(laneOffset[nonZeroAxis]) 
   }
   setGoal(x, y) {
     let currentDirection = this.getFacingDirection();
@@ -1603,6 +1605,7 @@ export class Car extends MovableEntity {
   setPath(value, isWrongDirection = false) {
     this.path = value;
     this.isWrongDirection = isWrongDirection;
+    if(this.isWandering)return
     let startIndex = drawPath(this.game.roads, value);
     if (startIndex === undefined) return;
     let roadIndexes = this.path.length < 3 ? this.path[this.path.length - 1] : this.path[1];
@@ -1636,176 +1639,293 @@ export class Car extends MovableEntity {
         return;
       }
       let foundIndex = this.path.findIndex(e=>e[0] == this.gridIndexes[0] && e[1] == this.gridIndexes[1]);
-      if (foundIndex == -1) {
+      if (foundIndex == -1&&!this.isWandering) {
         return this.setGoal(this.goal[0], this.goal[1]);
       }
-      this.setPath(this.path.slice(foundIndex));
+      if(foundIndex!=-1||this.isWandering){
+        this.lastPath=this.path[foundIndex-1]??this.lastPath
+        this.setPath(this.path.slice(foundIndex));
+      }
     }
-    if (this.partialGoal) {
-      let foundIndex = this.partialPath.findIndex(e=>e[0] == this.gridIndexes[0] && e[1] == this.gridIndexes[1]);
-      if (foundIndex == -1) return
-      this.partialPath=this.partialPath.slice(foundIndex)
+    if(this.isWandering){
+        if(!this.currentRoad){
+          let foundRoad = this.game.roads.flat().map(e=>[e,getMagnitude(this.posX-e.posX,this.posY-e.posY)]).sort((x,y)=>x[1]-y[1])[0][0]
+          this.goal=foundRoad.gridIndexes
+          this.path=[this.gridIndexes,foundRoad.gridIndexes]
+          return
+        }
+        let currentDirection = this.getFacingDirection()
+        let fromDirection = getOpposite(currentDirection)
+        let next = getNextDirection(this.currentRoad.roadType,this.currentRoad._direction,fromDirection)
+        let neighbours = getNeighbours(this.gridIndexes)
+        let coordinates = neighbours[connectionLookup[next]]
+        let path = [this.gridIndexes,coordinates]
+        let goal = coordinates
+        let nextRoad = this.game.roads[coordinates[0]]?.[coordinates[1]]
+        this.partialPath=[this.gridIndexes,coordinates]
+        while(nextRoad){
+          let nextConnections = getConnections(nextRoad.roadType, nextRoad._direction)
+          let nextNeighbours = getNeighbours(goal)
+          let goalIndex = nextNeighbours[connectionLookup[getRandom(nextConnections)]]
+          path.push(goalIndex)
+          goal=goalIndex
+          nextRoad=this.game.roads[goal[0]]?.[goal[1]]
+        }
+        this.path=path
+        this.goal=goal
     }
   }
   lastActionType=null
-  resetMoveLimiter(){
+  preventSign;
+  resetChanged(){
     this.entityMoveLimiter=1
+    this.laneMultiplier=1
   }
   getAction() {
-    let threatAction = this.getThreatAction(this.chosenAlgorithms[0]);
-    if (threatAction !== null) {
-      this.lastActionType="threat"
-      return threatAction;
-    }
-    let ruleAction = this.getRuleAction(this.chosenAlgorithms[1]);
-    if (ruleAction !== null){
-      this.lastActionType="rule"
-      return ruleAction;
+    if(!this.isOverriden){
+      let threatAction = this.getThreatAction(this.chosenAlgorithms[0]);
+      if (threatAction !== null) {
+        this.lastActionType="threat"
+        return threatAction;
+      }
+      let ruleAction = this.getRuleAction(this.chosenAlgorithms[1]);
+      if (ruleAction !== null){
+        this.lastActionType="rule"
+        return ruleAction;
+      }
     }
     //kurallar ve tehditler hızı sınırlayabiliyor, o sınır kaldırılıyor
-    this.resetMoveLimiter()
+    this.resetChanged()
     let goalAction = this.getGoalAction(this.chosenAlgorithms[2]);
     if (goalAction !== null){
       this.lastActionType="goal"
       return goalAction;
     }
-    if(this.isWandering){
-      let wanderAction = this.getWanderAction()
-      this.lastActionType="wander"
-      return wanderAction
+    return null;
+  }
+  checkSensor(entityTypes,requiredDistance,sensors=this.sensors.slice(0,2),checkEvery){
+    //signature mantığı olmadığı için kullanıldığı kısımda okunurluğu arttırmak için değişimi burada yapıyoruz
+    if(!Array.isArray(entityTypes))entityTypes=[entityTypes]
+    let foundEntity
+    let foundDistance = Infinity
+    let res = sensors[checkEvery?"every":"find"](sensor=>{
+      if(!sensor)return false
+      let [dist,entity] = sensor.output
+      let cond =  entity&&dist<=requiredDistance&&(entityTypes.includes("any")||entityTypes.includes(entity.entityType))
+      if(!cond)return false
+      if(dist<foundDistance){
+        foundDistance=dist||Number.EPSILON
+        foundEntity=entity
+      }
+      return true
+    })
+    if(!res)return false
+    return [foundDistance,foundEntity]
+  }
+  checkSign(entityTypes){
+    if(!Array.isArray(entityTypes))entityTypes=[entityTypes]
+    let facingDirection = this.getFacingDirection()
+    //haritaya göre değil, araca göre sağ
+    let right = connectionArray[(connectionLookup[facingDirection]+1)%4]
+    return this.currentRoad&&this.currentRoad.obstacles.find(e=>{
+      let entity = e[0]
+      if(!entityTypes.includes(entity.entityType)||entity!=this.preventSign)return false
+      let absoluteSubgrid = getAbsoluteSubgridIndex(entity.subgridIndexes,entity.parent._direction)
+      let directionList = getRelativeDirectionList([0,0],absoluteSubgrid)
+      return directionList.includes(right)
+    })
+  }
+  checkThreatCondition(){
+    return this.checkSensor(THREATS,90,this.sensors.slice(0,4))
+  }
+  stuckTick=0
+  _threatAction(dt){
+    if(!this.checkThreatCondition())return true
+    let sensors = this.sensors.slice(0,4).concat(this.sensors.slice(6,12)).map(e=>e.output)
+    let back = this.sensors.slice(-2).map(e=>e.output)
+    const THRESHOLD = 120
+    let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&THREATS.includes(sensors[0][1].entityType)
+    let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&THREATS.includes(sensors[1][1].entityType)
+    let mainTriggered = conditionFirst||conditionSecond
+    let bothTriggereed = conditionFirst&&conditionSecond
+    let triggered = sensors.map(e=>e[0]<THRESHOLD&&e[1])
+    let allFront = triggered.slice(0,4).every(e=>e)
+    let allTriggered = triggered.every(e=>e)
+    let freeSensors = sensors.filter(e=>e[1]==null)
+    //nesne araçsa sağa gidecek şekilde arttırılabilir
+    let increasers = [-2,-1,1,-3,1,-1,1,-1,1,-1]
+    if(allTriggered){
+      if(back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
+        this.entityMoveLimiter=1
+        this.moveBackward(dt)
+        return true
+      }
+    }else if(mainTriggered){
+      if(sensors.find(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
+        let sum = 0
+        sensors.forEach((e,i)=>{
+          if(e[0]<THRESHOLD/2){
+            sum+=increasers[i]
+          }
+        })
+        let sumSign = Math.sign(sum)
+        this.steer(dt,sumSign)
+        if(sumSign!=this.laneMultiplier)this.switchLane()
+        this.stuckTick=bothTriggereed?this.tickCounter:0
+        let lastLimiter = this.entityMoveLimiter
+        if(allFront)this.entityMoveLimiter=Math.max(bothTriggereed?0:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
+        if(this.entityMoveLimiter==0||lastLimiter){
+
+        }
+      }
+    }else if(this.laneMultiplier==-1){
+    }
+    return true
+
+  }
+  getThreatAction(chosenAlgorithm) {
+    if(chosenAlgorithm=="rule"){
+      if(this.checkThreatCondition()){
+        return this._threatAction
+      }
+    }else{
+
     }
     return null;
   }
-  getThreatAction(chosenAlgorithm) {
-    // Şu anda kullanılmıyor
-    return null;
+  checkLaneCondition(){
+    return this.checkSensor("road",20,[this.sensors[7],this.sensors[9]],true)
+  }
+  checkLightCondition(){
+    let res = this.checkSensor("light",80)
+    if(res&&res[1].state!=LIGHT_STATES[2])return res
+    return false
+  }
+  _laneAction(dt){
+    let res = this.checkLaneCondition()
+    if(!res)return true
+    this.steer(dt,Math.max(-2,-CAR_WIDTH/res[0]/10))
+    return true
+  }
+  _lightAction(dt){
+    let res = this.checkLightCondition()
+    if(!res){
+      this.entityMoveLimiter=1
+      return true
+    }
+    let [dist,light] = res
+    if((light.state==LIGHT_STATES[0]&&dist<50)||(light.state==LIGHT_STATES[1]&&dist>=20)){
+      this.entityMoveLimiter*=0.7
+      this.brake(dt)
+    }
+    if(light.state==LIGHT_STATES[1]){
+      this.entityMoveLimiter=Math.max(0.5,this.entityMoveLimiter*0.9)
+      this.allowSteer=true
+    }
+    return true
+  }
+  checkBumpCondition(){
+    return this.checkSensor("kasis",27)
+  }
+  _bumpAction(dt){
+    let res = this.checkBumpCondition()
+    if(!res){
+      if(this.entityMoveLimiter>0.8){
+        this.entityMoveLimiter=1
+        return true
+      }
+      this.entityMoveLimiter=(1+this.entityMoveLimiter)/2
+    }
+    this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter-this.absoluteVel()/100)
+    return true
   }
   getRuleAction(chosenAlgorithm) {
-    // Şu anda kullanılmıyor
+    if(chosenAlgorithm=="rule"){
+      if(this.checkLaneCondition()){
+        return this._laneAction
+      }
+      if(this.checkLightCondition()){
+        return this._lightAction
+      }
+      if(this.checkBumpCondition()){
+        return this._bumpAction
+      }
+    }
     return null;
   }
   getGoalAction(chosenAlgorithm) {
-    if (this.path && this.path.length > 0) {
+    if (this.isWandering||this.path && this.path.length > 0) {
       return this._getGoalAction;
     }
     return null;
   }
+
   _getGoalAction(dt) {
-    if (!this.path || this.path.length == 0) return this.isWandering
-    let currGoal = this.path[1] || this.path[0];
+    if (!this.path || this.path.length<2){
+      if(this.isWandering){
+        this.goal=null
+        this.resetPath()
+        if(!this.path||!this.path[1])return
+      }else return
+    }
+    if(this.isWandering)this.lastActionType="wander"
     if(!arrayEquals(this.path[0],this.gridIndexes)){
       this.resetPath()
       if (!this.path || this.path.length == 0) return this.isWandering
     }
+    let currCoords = getCoordinates(this.gridIndexes[0],this.gridIndexes[1])
+    //sol üstten başlıyor
+    let relativeToCurr = [this.posX-currCoords[0]-ROAD_WIDTH/2,this.posY-currCoords[1]-ROAD_WIDTH/2]
+    let distanceToNext = getDistance([this.posX,this.posY],getCoordinates(this.path[1][0],this.path[1][1]))
     //şerit ihlalini engellemiyor, istenen şeride yakın gidiyor. değiştirilecek
     let facingDirection = this.getFacingDirection()
-    let relativeDirection = this.path.length==1?facingDirection:getRelativeDirection(this.gridIndexes, currGoal);
-    let nextDirection = this.path.length > 2 && getRelativeDirection(this.path[2], this.path[1])
+    let relativeDirection = getRelativeDirection(this.path[0],this.path[1])
+    let goalDirection = getRelativeDirection(this.path[1],this.path[0])
+    let nextStart = this.path.length>2?this.path[1]:this.path[0]
+    let nextEnd = this.path.length>2?this.path[2]:this.path[1]
+    let nextDirection = getRelativeDirection(nextEnd, nextStart)
+    let lastDirection = this.lastPath?getRelativeDirection(this.path[0],this.lastPath):facingDirection
+    let relativeTurningDirection = connectionArray[(connectionLookup[goalDirection]-connectionLookup[lastDirection]+4)%4]
+    let isTurning = lastDirection!=goalDirection
+    let isNowTurning = facingDirection!=goalDirection
     let willTurn = nextDirection != facingDirection ? -1 : 1;
-    //normalde willTurn'ün belli dönüşlerde sağ şeridi zorunlu kılması lazım ama zaten getThreatAction ve getRuleAction dışında araç sol şeride geçemez
-    //onlarda da kod buraya gelemez
-    //yukarı giderken sağa dönecekse, sağa giderken aşağı dönecekse vs. geniş alması gerekiyor, bu örüntü her zaman connection arrayinde 1 fark oluşturuyor
-    let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
-    //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
-    this.sprite.tint===-1?0x00ff00:0xffffff
-    let currentDivider = currentMultiplier==-1?15:10
-    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
-    let dx = targetX - this.posX;
-    let dy = targetY - this.posY;
-    // Hedefe doğru açıyı hesapla
-    let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
-    let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
-    if (angleDifference > 180) {
-        angleDifference -= 360;
-    }
-    // Yön ayarlaması yap
-    if (angleDifference > 3) {
-      this.steerRight(dt);
-    } else if (angleDifference < -3) {
-      this.steerLeft(dt);
-    }
-    this.moveForward(dt);
-  }
-  getWanderAction(){
-    if(!this.isWandering)return null
-    return this._getWanderAction
-  }
-  partialPath=[]
-  partialGoal
-  _getWanderAction(dt){
-    if (!this.isWandering) return true
-    let currGoal    
-    let neighbours = getNeighbours(this.gridIndexes)
-    let noRoad = !this.currentRoad
-    if(!this.partialGoal||this.partialGoal.length==0||arrayEquals(this.partialGoal,this.gridIndexes)){
-      if(noRoad){
-        //yoksa en yakın yola doğru
-        //belki baktığı yöne göre filtrelenebilir
-        let foundRoad = this.game.roads.flat().map(e=>[e,getMagnitude(this.posX-e.posX,this.posY-e.posY)]).sort((x,y)=>x[1]-y[1])[0][0]
-        currGoal=foundRoad.gridIndexes
-        this.partialPath=[this.gridIndexes,currGoal]
-      }else{
-        //varsa yoldaki sonraki yöne doğru 2 adım, harita dışına çıksa bile
-        let currentDirection = this.getFacingDirection()
-        let fromDirection = getOpposite(currentDirection)
-        let next = getNextDirection(this.currentRoad.roadType,this.currentRoad._direction,fromDirection)
-        let coordinates = neighbours[connectionLookup[next]]
-        let nextRoad = this.game.roads[coordinates[0]]?.[coordinates[1]]
-        this.partialPath=[this.gridIndexes,coordinates]
-        if(nextRoad){
-          let nextConnections = getConnections(nextRoad.roadType, nextRoad._direction)
-          let nextNeighbours = getNeighbours(coordinates)
-          let goalIndex = nextNeighbours[connectionLookup[shuffle(nextConnections)[0]]]
-          this.partialPath.push(goalIndex)
-          currGoal=goalIndex
-        }else currGoal=coordinates
-      }
-      this.partialGoal=currGoal
-    }else currGoal=this.partialGoal
-    /*
-        let facingDirection = this.getFacingDirection()
-    let relativeDirection = this.path.length==1?facingDirection:getRelativeDirection(this.gridIndexes, currGoal);
-    let nextDirection = this.path.length > 2 && getRelativeDirection(this.path[2], this.path[1])
-    let willTurn = nextDirection != facingDirection ? -1 : 1;
-    //normalde willTurn'ün belli dönüşlerde sağ şeridi zorunlu kılması lazım ama zaten getThreatAction ve getRuleAction dışında araç sol şeride geçemez
-    //onlarda da kod buraya gelemez
-    let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
-    //aracın şeridin ortasına yaklaşacak şekilde geniş alması yeterli
-    let currentDivider = currentMultiplier==-1?15:10
-    let [targetX, targetY] = getLaneCoordinates(relativeDirection, currGoal, currentMultiplier, currentDivider);
-    */
-    //currGoal getGoalAction'dakinden farklı
-    let facingDirection = this.getFacingDirection()
-    let relativeDirection = this.partialPath.length==1?facingDirection:getRelativeDirection(this.gridIndexes, this.partialPath[1]);
-    let nextDirection = this.partialPath.length > 2 && getRelativeDirection(this.partialPath[2], this.partialPath[1])
-    let willTurn = nextDirection != facingDirection ? -1 : 1;
-    let currentMultiplier = nextDirection&&(connectionLookup[nextDirection]-connectionLookup[relativeDirection]+4)%4!=1&&willTurn==-1?willTurn:this.laneMultiplier
-    let currentDivider = currentMultiplier==-1?10:10
-    let [targetX, targetY] = getLaneCoordinates(relativeDirection, this.partialPath[1], currentMultiplier, currentDivider);
+    const THRESHOLD = ROAD_WIDTH/4
+    
+    let hasPassedStart =!isTurning||(!relativeToCurr.find(e=>Math.abs(e/THRESHOLD)>3))
+    let roadDistanceMultiplier = isTurning?1:1
+    let hasCompletedCurrentRoad = distanceToNext<ROAD_WIDTH*roadDistanceMultiplier
+    let midGoal = [(this.path[0][0]*0.8+this.path[1][0]*0.2),(this.path[0][1]*0.8+this.path[1][1]*0.2)]
+    let useCurrent = isTurning&&!hasCompletedCurrentRoad
+    //this.sprite.tint=useCurrent?0x00ff00:willTurn==-1?0x0000ff:0xffffff
+    let currGoal = useCurrent?midGoal:this.path[1]
+    let currentMultiplier = this.laneMultiplier
+    let currentDivider = useCurrent?10:8
+    let directionToUse = (isTurning&&!hasCompletedCurrentRoad)?lastDirection:relativeDirection
+    let [targetX, targetY] = getLaneCoordinates(directionToUse, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
     let dy = targetY - this.posY;
     let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
     let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
+    if(this.isMain){
+      //console.log(lastDirection,facingDirection,nextDirection)
+    }
     if (angleDifference > 180) {
         angleDifference -= 360;
     }
-    if (angleDifference > 3) {
-      this.steerRight(dt);
-    } else if (angleDifference < -3) {
-      this.steerLeft(dt);
+    let steeringMultiplier = 1
+    if(currentMultiplier==-1)steeringMultiplier=1
+    if(Math.abs(angleDifference)>2){
+      steeringMultiplier*=Math.sign(angleDifference)
+      this.steer(dt,steeringMultiplier)
     }
     this.moveForward(dt);
+  }
+  resetPrevented(){
+    this.preventSign=null
   }
   setVehicleProperties() {
     let currentProperties = calculateVehicleProperties(this.currentRoad?.roadCondition || "asphalt", this.isTurning, this.isUsingBrake);
-    let {
-      acceleration,
-      drag,
-      turnDrag,
-      steering,
-      turnLimiters,
-      alignment
-    } = currentProperties;
+    let {acceleration,drag,turnDrag,steering,turnLimiters,alignment} = currentProperties;
     this.entityMoveMultiplier = acceleration;
     this.entityDrag = drag;
     this.entityTurnDrag = turnDrag;
@@ -1851,29 +1971,36 @@ export class Car extends MovableEntity {
     this.isUsingBrake = false;
     this.lastIsTurning = this.isTurning;
     this.isTurning = false;
+    this.isAccelerating=false
+    this.allowSteer=false
+    this.isOverriden=false
   }
-  accelerate(dt = 1, scale = 1) {
+  accelerate(dt = 1, scale = 1,setOverride=false) {
+    if(setOverride)this.isOverriden=true
+    if(this.isAccelerating)return
     let degree = this._direction;
     let radian = toRadian(degree);
     this.accX += Math.cos(radian) * this.entityMoveMultiplier*this.entityMoveLimiter * scale * dt;
     this.accY += Math.sin(radian) * this.entityMoveMultiplier*this.entityMoveLimiter * scale * dt;
+    this.isAccelerating=true
   }
-  moveForward(dt = 1, scale = 1) {
+  moveForward(dt = 1, scale = 1,setOverride=false) {
     // scale 0-1.0 arasında, ivmelenme kontrolünde lazım olacak
-    this.accelerate(dt * 1000, scale);
+    this.accelerate(dt * 1000, scale,setOverride);
   }
   // Geri hareket fonksiyonu
-  moveBackward(dt = 1, scale = 1) {
-    this.accelerate(dt * 1000, -scale / 2);
+  moveBackward(dt = 1, scale = 1,setOverride=false) {
+    this.accelerate(dt * 1000, -scale / 2,setOverride);
   }
   isGoingBackwards(alignment = getAlignment()) {
     return alignment < 0;
   }
-  steer(dt, angle) {
+  steer(dt, angle,setOverride=false) {
+    if(setOverride)this.isOverriden=true
     let currentMultiplier = this.entitySteeringMultiplier;
     let alignment = this.getAlignment();
     let isGoingBackwards = this.isGoingBackwards(alignment);
-    if (Math.abs(alignment) < ((this.entityminAlignment / this.absoluteVel()) * this.entityMoveMultiplier) / ((isGoingBackwards ? this.entityTurnLimiters[0] : this.entityTurnLimiters[1]) + (this.isUsingBrake ? 2 : 0))) return;
+    if (!this.allowSteer&&Math.abs(alignment) < ((this.entityminAlignment / this.absoluteVel()) * this.entityMoveMultiplier) / ((isGoingBackwards ? this.entityTurnLimiters[0] : this.entityTurnLimiters[1]) + (this.isUsingBrake ? 2 : 0))) return;
     this.isTurning = true;
     currentMultiplier *= dt * 100;
     if (this.isUsingBrake) {
@@ -1884,11 +2011,11 @@ export class Car extends MovableEntity {
     }
     this.direction += angle * currentMultiplier;
   }
-  steerLeft(dt) {
-    this.steer(dt, -1);
+  steerLeft(dt,setOverride=false) {
+    this.steer(dt, -1,setOverride);
   }
-  steerRight(dt) {
-    this.steer(dt, 1);
+  steerRight(dt,setOverride=false) {
+    this.steer(dt, 1,setOverride);
   }
   brake(dt) {
     this.accX *= 0.999 ** (dt * 100);
@@ -1901,13 +2028,15 @@ export class Car extends MovableEntity {
     super.destroy();
     this.shouldDraw = false;
     this.drawCollision = false;
+    this.removeDrawer(this.customLineDrawer);
     this.customLine.destroy();
     this.sensors.forEach(e=>e.destroy())
-    cars.splice(cars.indexOf(this), 1);
+    this.game.cars.splice(this.game.cars.indexOf(this), 1);
   }
   setPosition(x,y){
     super.setPosition(x,y)
     this.setRoad()
+    this.setVehicleProperties()
   }
   setRoad() {
     let currRoad = this.game.roads[this.gridIndexes[0]]?.[this.gridIndexes[1]];
@@ -1919,6 +2048,7 @@ export class Car extends MovableEntity {
     this.setVehicleProperties();
     this.onIndexChange.push(this.setRoad);
     this.onIndexChange.push(this.resetPath);
+    this.onIndexChange.push(this.resetPrevented);
     this.onIndexChange.push(this.setVehicleProperties);
     this.childGraphics.push(this.customLine);
     this.width = CAR_WIDTH;
@@ -1928,13 +2058,15 @@ export class Car extends MovableEntity {
     this.entityType = "car";
     this.addSensor(-this.directionOffset - 10, 1.4, 20);
     this.addSensor(-this.directionOffset + 10, 1.4, 20);
+    this.addSensor(-this.directionOffset - 25, 1.8, 20);
+    this.addSensor(-this.directionOffset + 25, 1.8, 20);
     this.addSensor(this.directionOffset - 10, 0.5);
     this.addSensor(this.directionOffset + 10, 0.5);
     for (let i = 0; i < 3; i++) {
       this.addSensor(this.directionOffset + 90 + i * 10, 0.7, i * 10);
       this.addSensor(this.directionOffset - 90 - i * 10, 0.7, i * 10);
     }
-    cars.push(this);
+    this.game.cars.push(this);
   }
 }
 export class MainCar extends Car {
@@ -2664,15 +2796,15 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
   // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
   switch (roadCondition) {
     case "dirt":
-      acceleration = 90;
+      acceleration = 80;
       drag = 6;
       turnDrag = 1.2;
-      alignment = 0.35;
-      steering = 1;
+      alignment = 0.7;
+      steering = 1.2;
       turnLimiters = [2.5, 1.25];
       break;
     case "slippery":
-      acceleration = 115;
+      acceleration = 80;
       drag = 4;
       turnDrag = 1.26;
       alignment = 0.35;
@@ -2823,10 +2955,11 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 4;
+  wandererAmount = 6
   wanderers;
   resolveCollision=false
   lights=[]
+  cars=[]
   synchronizeLights(){
     //bura
     let lightToLightAverage = []
@@ -2855,9 +2988,10 @@ export class Game {
   }
   createWanderer(fromEdge) {
     let wanderer = new Car(this, "temp_car");
-    let possibleRoads = fromEdge?this.possibleRoads.filter(e=>this.roads[e[0]][e[1]].roadType!="rightcurve"&&(e[0]==0||e[0]==GRID_WIDTH-1||e[1]==0||e[1]==GRID_HEIGHT-1)):
+    let possibleRoads = fromEdge?this.possibleRoads.filter(e=>(this.roads[e[0]][e[1]].roadType!="rightcurve"&&(e[0]==0||e[0]==GRID_WIDTH-1||e[1]==0||e[1]==GRID_HEIGHT-1))&&!this.cars.find(car=>arrayEquals(car.gridIndexes,e))):
       this.possibleRoads.slice(0)
-    let road = shuffle(possibleRoads)[0];
+    if(!possibleRoads[0])return
+    let road = getRandom(possibleRoads)
     road = this.roads[road[0]][road[1]];
     wanderer.setPosition(road.posX, road.posY);
     wanderer.direction = connectionLookup[shuffle(getConnections(road.roadType, road._direction))[0]] * 90;
@@ -2871,7 +3005,7 @@ export class Game {
   }
   setWanderers() {
     for (let i = 0; i < this.wandererAmount; i++) {
-      this.createWanderer();
+      this.createWanderer(true);
     }
   }
   tick(dt) {
@@ -3123,7 +3257,7 @@ export class Game {
     }
     entities.forEach(e=>e.destroy());
   }
-  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 16, minObstacles = 4) {
+  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 20, minObstacles = 10) {
     this.minObstacles = minObstacles;
     this.maxObstacles = maxObstacles;
     this.obstacleAmounts = obstacleAmounts;

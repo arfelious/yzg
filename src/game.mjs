@@ -12,7 +12,8 @@ import {
 } from "../src/engine.mjs";
 
 let game = new Game(app.stage);
-//game.setWanderers()
+window.game=game
+game.setWanderers()
 let currentStart =
   game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
@@ -109,19 +110,19 @@ let updateLoop = () => {
   accumulatedTime += diff;
   while (accumulatedTime >= FIXED_LOOP_MS) {
     if (isDown[" "]||isDown["button_BRAKE"]) {
-      mainCar.brake(FIXED_LOOP_S);
+      mainCar.brake(FIXED_LOOP_S,true);
     }
     if (isDown["W"] || isDown["ARROWUP"] || isDown["button_UP"]) {
-      mainCar.moveForward(FIXED_LOOP_S);
+      mainCar.moveForward(FIXED_LOOP_S,1,true);
     }
     if (isDown["S"] || isDown["ARROWDOWN"] || isDown["button_DOWN"]) {
-      mainCar.moveBackward(FIXED_LOOP_S);
+      mainCar.moveBackward(FIXED_LOOP_S,1,true);
     }
     if (isDown["A"] || isDown["ARROWLEFT"] || isDown["button_LEFT"]) {
-      mainCar.steerLeft(FIXED_LOOP_S);
+      mainCar.steerLeft(FIXED_LOOP_S,true);
     }
     if (isDown["D"] || isDown["ARROWRIGHT"] || isDown["button_RIGHT"]) {
-      mainCar.steerRight(FIXED_LOOP_S);
+      mainCar.steerRight(FIXED_LOOP_S,true);
     }
     game.tick(FIXED_LOOP_S);
     accumulatedTime -= FIXED_LOOP_MS;
