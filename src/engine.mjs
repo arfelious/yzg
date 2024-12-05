@@ -1204,7 +1204,7 @@ class Entity {
     let currGrids = this.currentGrids;
     return this.game.entities.filter(e=>{
       let cachedGrids = e.currentGrids;
-      if (e == this || e.entityType == "sensor") return false;
+      if (e == this || e.entityType == "sensor"||e.entityType=="sand") return false;
       //normalde genişliğin yarısına bakmak yeterli olmalı ama nesnelerin anchor'ına bakmadan emin olunamıyor
       //yollar için emin olunabilir
       //sqrt2 kısmı merkezden max uzaklık için
@@ -1422,9 +1422,11 @@ export class Sand extends Entity{
   zIndex=3
   parent;
   subgridIndexes
+  isImmovable=true
   constructor(game,parent,subgrid,oceanIndex,isSmall=false){
     super(game)
     this.parent=parent
+    this.entityType="sand"
     let relativeSubgrid = getAbsoluteSubgridIndex(subgrid,this.parent._direction,true)
     let subgridWidth = ROAD_WIDTH/3
     let smallSideWidth = ROAD_WIDTH/4
@@ -1670,8 +1672,8 @@ export class Car extends MovableEntity {
       }
       if(foundIndex!=-1||this.isWandering){
         this.lastPath=this.path[foundIndex-1]??this.lastPath
-        this.setPath(this.path.slice(foundIndex));
       }
+      this.setPath(this.path.slice(foundIndex));
     }
     if(this.isWandering){
         if(!this.currentRoad){
@@ -1762,7 +1764,7 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(THREATS,90,this.sensors.slice(0,4))
+    return this.checkSensor(THREATS,100,this.sensors.slice(0,4))
   }
   _threatAction(dt){
     if(!this.checkThreatCondition())return true
@@ -1773,46 +1775,35 @@ export class Car extends MovableEntity {
     let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&THREATS.includes(sensors[1][1].entityType)
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
-    let triggered = sensors.map(e=>e[0]<THRESHOLD&&e[1])
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
-    //temas edilemeyeecek şeyler filtrelenmeli
-    let allFront = triggered.slice(0,4).every(e=>e)
-    let allTriggered = triggered.every(e=>e)
-    let freeSensors = sensors.filter(e=>e[1]==null)
-    let threatIsCar = sensors.find(e=>e&&e.entityType=="car")
     //nesne araçsa sağa gidecek şekilde arttırılabilir
-    let increasers = [3.5,-2,3,-2,-1.5,1,-1.5,1,-1.5,1]
+    //yavaşlamanın koşulları arttırılmalı
+    let increasers = [1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
     let sum = 0
     sensors.forEach((e,i)=>{
-      if(e[0]<THRESHOLD/2&&(!e[1]||e[1].entityType=="yayaGecidi")){
+      if(e[1]&&e[1].entityType!="yayaGecidi"){
         sum+=increasers[i]
       }
     })
     let absVelocity = this.absoluteVel()
-    if(absVelocity<2||allFront||(mainTriggered&&sensors[0][0]<THRESHOLD*3/4&&sensors[1][0]<THRESHOLD*3/4)){
-      if(back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
-        this.entityMoveLimiter=1
-        let sumSign = Math.sign(sum)
-        //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-        if(this.getAlignment()<=0||this.absVelocity<10){
-          this.moveBackward(dt)
-          this.steer(dt,sumSign*2)
-        }else this.steer(dt,-sumSign*2)
-      return
-      }
-    }
     if(mainTriggered){
-      if(sensors.find(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
-        let sumSign = Math.sign(sum)
-        this.steer(dt,-sumSign*1.5)
+      let sumSign = Math.sign(sum)
+      //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
+      let backSensorsFree = back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))
+      if(backSensorsFree&&(this.getAlignment()<=0||absVelocity<5)){
+        this.entityMoveLimiter=1
+        this.moveBackward(dt)
+        this.steer(dt,-sumSign*2)
+      }else{
+        this.entityMoveLimiter=Math.max(bothTriggereed?0:0.8,this.entityMoveLimiter-this.absoluteVel()/100)
+        this.moveForward(dt)
+        this.steer(dt,sumSign*2)
         if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
       }
-      if(allFront){
-        if(this.entityMoveLimiter==1)this.brake(dt)
-        this.entityMoveLimiter=Math.max(bothTriggereed?0:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
-      }
+      return
+      
     }
     return true
 
@@ -2578,6 +2569,8 @@ export class Light extends Obstacle {
   }
 }
 export class Ocean extends Entity {
+  anchorX=0.5
+  anchorY=0.5
   constructor(game) {
     super(game);
     this.forceSquare = true;
@@ -2585,7 +2578,7 @@ export class Ocean extends Entity {
     this.width = ROAD_WIDTH;
     this.sprite = "ocean.jpeg";
     this.sprite.zIndex = 3;
-    this.sprite.tint = 0x00ffaa;
+    this.sprite.tint = 0x00ffcf;
   }
 }
 class Filler extends Entity {
@@ -3087,7 +3080,7 @@ export class Game {
         let currOcean = new Ocean(this);
         filled[e.join(",")] = true;
         let [i, j] = e;
-        currOcean.setPosition(ROAD_WIDTH * (i + 1), ROAD_WIDTH * j);
+        currOcean.setPosition(ROAD_WIDTH * (i + 0.5), ROAD_WIDTH * (j+0.5));
         let index = e
         let rawNeighbours = getNeighbours(index).map(e=>this.roads[e[0]]?.[e[1]])
         for(let i = 0;i<4;i++){
