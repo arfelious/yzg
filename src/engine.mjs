@@ -10,7 +10,6 @@
           bir yola aynı levhadan iki tane koyulmayacak
           komşu subgrid'lere ışık gelebilip gelemediği test edilecek
           shuffle kullanan yerler optimize edilecek
-          doğru grid'de olanların filtrelenmesi yerine her tick sonunda nesneler kendilerini o grid'e ekleyecek, collision kontrolü ona göre olacak
           levhaların türü farklı olabilir, collision olarak algılanmamaları daha iyi olabilir
           giriş menüsü, start ve test kısmı
           yol bulma algoritmaları için test verisi eklenmeli
@@ -85,6 +84,7 @@ let changeImageResolution = async (texture, options) => {
   });
 };
 const THREATS = ["rogar","bariyer","cukur","car"]
+const PHYSICAL_THREATS = ["bariyer","car"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
 const ROAD_CONDITION_WEIGHTS = {
@@ -1139,25 +1139,17 @@ class Entity {
   massMultiplier=1
   subgridEntities=[]
   isChild=false
+  currentGridsArray=[]
   setSand(subgridX,subgridY,oceanIndex,isSmall=false){
     let sand = new Sand(this.game,this,[subgridX,subgridY],oceanIndex,isSmall)
+    this.subgridEntities.push([sand.subgridIndexes,sand])
   }
   getGrids() {
-    //Array'de olup olmadığının hızlı anlaşılması için string olarak tutulması gerekiyor
     let lines = this.getLines();
     let points = lines.map(e=>e[0]);
-    let indexes = new Set();
-    let saved = {};
-    let curr = this.gridIndexes[0].toString()+","+this.gridIndexes[1].toString(); //JIT için daha .join kullanmaktan daha öngörülebilir
-    indexes.add(curr);
-    saved[curr] = true;
-    points.map(e=>getIndexes(e[0], e[1])).forEach(e=>{
-      let curr = e[0].toString()+","+e[1].toString()
-      if (saved[curr]) return;
-      indexes.add(curr);
-      saved[curr] = true;
-    });
-    return indexes;
+    let currentGridsArray = points.map(e=>getIndexes(e[0], e[1]))
+    this.currentGridsArray=currentGridsArray
+    return new Set(currentGridsArray)
   }
   addDrawer = (fun) => {
     this.customDrawers.add(fun);
@@ -1198,19 +1190,19 @@ class Entity {
   getFacingDirection() {
     return connectionArray[this.getAngleIndex()];
   }
+  getRelevantEntities(){
+    return this.currentGridsArray.filter(inBounds).map(e=>[...this.game.gridEntitySets[e[0]][e[1]]]).flat()
+  }
   getColliders() {
     if (!this.isCollisionEffected) return [];
     let currLines = this.getLines();
-    let currGrids = this.currentGrids;
-    return this.game.entities.filter(e=>{
-      let cachedGrids = e.currentGrids;
+    return this.getRelevantEntities().filter(e=>{
       if (e == this || e.entityType == "sensor"||e.entityType=="sand") return false;
       //normalde genişliğin yarısına bakmak yeterli olmalı ama nesnelerin anchor'ına bakmadan emin olunamıyor
       //yollar için emin olunabilir
       //sqrt2 kısmı merkezden max uzaklık için
       let distance = getMagnitude(this.posX - e.posX, this.posY - e.posY);
       if (distance > (this.width + e.width) * Math.SQRT2) return;
-      if(cachedGrids.isDisjointFrom(currGrids))return
       let entityLines = e.getLines();
       return currLines.find((l1) => {
         let retVal = entityLines.find((l2) => checkIntersects(l1[0], l1[1], l2[0], l2[1]));
@@ -1325,7 +1317,9 @@ class Entity {
     this.posY = y;
     this.gridIndexes = getIndexes(x, y, this.anchorX * this.width, this.anchorY * this.height);
     this.cachedLines = null;
+    let lastGrids = this.currentGrids
     this.currentGrids = this.getGrids();
+    this.resetGridSets(lastGrids)
     this.redrawNecessary = true;
   }
   get position() {
@@ -1369,6 +1363,21 @@ class Entity {
   getAlignment() {
     return (dotProduct(toUnitVector([this.velX, this.velY]), toVector(this._direction)) || 0);
   }
+  resetGridSets(lastGrids){
+    if(lastGrids){
+      //belki manuel döngüden daha hızlıdır
+      let diff = lastGrids.difference(this.currentGrids)
+      let diffSize = diff.size
+      if(diffSize>0){
+        diff.forEach(e=>inBounds(e)&&this.game.gridEntitySets[e[0]][e[1]].delete(this))
+      }
+      let added = this.currentGrids.difference(lastGrids)
+      let addedSize = added.size
+      if(addedSize>0){
+        added.forEach(e=>inBounds(e)&&this.game.gridEntitySets[e[0]][e[1]].add(this))
+      }
+    }
+  }
   tick() {
     if (!this.destroyed) {
       if (this.sprite.x != this.posX) {
@@ -1393,10 +1402,13 @@ class Entity {
       this.sprite.angle = this.direction;
     } else {
       this.cachedLines = null;
+      let lastGrids = this.currentGrids
       this.currentGrids = this.getGrids();
+      this.resetGridSets(lastGrids)
     }
   }
   destroy() {
+    this.resetGridSets(this.currentGrids)
     this.shouldDraw = false;
     this.destroyed = true;
     this.game.entities.splice(this.game.entities.indexOf(this), 1);
@@ -1452,7 +1464,6 @@ export class Sand extends Entity{
     this.setPosition(positionX,positionY)
     this.subgridIndexes=relativeSubgrid
     this.direction=angleToUse
-    this.parent.subgridEntities.push([this.subgridIndexes,this])
   }
 }
 export class MovableEntity extends Entity {
@@ -2115,10 +2126,9 @@ export class Road extends Entity {
     this.#alignObstacles();
   }
   getGrids() {
-    let indexes = new Set();
-    let curr = this.gridIndexes.join(",");
-    indexes.add(curr);
-    return indexes;
+    let currentGridsArray = [this.gridIndexes]
+    this.currentGridsArray=currentGridsArray
+    return new Set(currentGridsArray);
   }
   getLines() {
     if (this.cachedLines) return this.cachedLines;
@@ -2666,7 +2676,9 @@ export class Building extends Filler {
     this.sides[1].sprite.skew.x = 0;
     this.gridIndexes = getIndexes(x, y);
     this.cachedLines = null;
+    let lastGrids = this.currentGrids
     this.currentGrids = this.getGrids();
+    this.resetGridSets(lastGrids)
   }
   spriteWidth = ROAD_WIDTH * BUILDING_MULTIPLIER;
   constructor(game) {
@@ -2716,23 +2728,25 @@ export class Sensor extends MovableEntity {
     if(this.lastGrids&&this.lastStart[0]==start[0]&&this.lastStart[1]==start[1]&&this.lastEnd[0]==end[0]&&this.lastEnd[1]){
       return this.lastGrids
     }
-    let indexes = new Set();
-    let saved = {};
+    let currentGridsArray = []
     let minX = Math.min(start[0],end[0])
     let maxX = Math.max(start[0],end[0])
     let minY = Math.min(start[1],end[1])
     let maxY = Math.max(start[1],end[1])
     for(let i = minX;i<=maxX;i++){
       for(let j = minY;j<=maxY;j++){
-        let curr = i.toString()+","+j.toString()
-        if (saved[curr]) return;
-        indexes.add(curr);
-        saved[curr] = true;
+        let curr = [i,j]
+        currentGridsArray.push((curr));
       }
     }
     this.lastStart=start
     this.lastEnd=end
-    return this.lastStart=indexes;
+    let lastGrids = this.currentGrids
+    this.currentGridsArray=currentGridsArray
+    if(this.isImmovable){
+      this.resetGridSets(lastGrids)
+    }
+    return this.lastStart=new Set(currentGridsArray);
   }
   getColliders() {
     return super.getColliders().filter(e=>e != this.parent);
@@ -2931,7 +2945,7 @@ let resolveAllCollisions = (elements, elasticity = 1, maxIterations = 10, correc
       hasCollisions = false;
       for (const [elm1, colliders] of elements) {
         for (const elm2 of colliders) {
-            if (!THREATS.includes(elm2.entityType)) continue;
+            if (!PHYSICAL_THREATS.includes(elm2.entityType)) continue;
             let absBounds1 = getAbsoluteBounds(elm1);
             let absBounds2 = getAbsoluteBounds(elm2);
             if (!isOverlapping(absBounds1, absBounds2))continue
@@ -2984,11 +2998,12 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 6
+  wandererAmount = 10
   wanderers;
   resolveCollision=false
   lights=[]
   cars=[]
+  gridEntitySets
   synchronizeLights(){
     //bura
     let lightToLightAverage = []
@@ -3043,7 +3058,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(this.globalColliders,1,3,0.01,0.0001)
+      resolveAllCollisions(this.globalColliders,1,10,0.01,0.0001)
     }
     this.globalColliders = new Set();
     this.tickCounter++;
@@ -3280,6 +3295,9 @@ export class Game {
     }
     return true;
   }
+  setGridEntitySets(){
+    this.gridEntitySets=Array(GRID_WIDTH).fill().map(()=>Array(GRID_HEIGHT).fill().map(e=>new Set()))
+  }
   destroy() {
     this.destroyed = true;
     if (this.stage) {
@@ -3292,6 +3310,7 @@ export class Game {
     this.maxObstacles = maxObstacles;
     this.obstacleAmounts = obstacleAmounts;
     this.stage = stage;
+    this.setGridEntitySets()
     this.setMap();
     this.setRoads();
     this.fillEmpty();
