@@ -104,10 +104,24 @@ app.canvas.onpointerup = (e) => {
   }
   mainCar.setGoal(x, y);
 };
+//https://stackoverflow.com/questions/1760250/how-to-tell-if-browser-tab-is-active
+let notActiveFor = 0
+let notActiveStart = Date.now()
+window.onfocus = function () { 
+  notActiveFor=Date.now()-notActiveStart
+}; 
+window.onblur = function () { 
+  notActiveStart=Date.now()
+}; 
 let updateLoop = () => {
   let now = Date.now();
   let diff = now - lastUpdate;
-  accumulatedTime += diff;
+  //sayfa arkaplana alındığında yeniden sayfaya geçildiğinde geçen sürenin tamamına dair değerler hesaplanıyordu
+  //bu şekilde yapılınca kaldığı yerden devam ediyor
+  accumulatedTime += Math.max(FIXED_LOOP_MS,diff-notActiveFor);
+  if(notActiveFor!=0){
+    notActiveFor=0
+  }
   while (accumulatedTime >= FIXED_LOOP_MS) {
     if (isDown[" "]||isDown["button_BRAKE"]) {
       mainCar.brake(FIXED_LOOP_S,true);

@@ -164,6 +164,26 @@ const OBSTACLES = {
     roadCondition:"asphalt",
     roadConditionInverted:false
   },
+  hiz: {
+    isOnRoad: false,
+    roadTypes: withoutCurve,
+    width: CAR_WIDTH,
+    image: "hiz.png",
+    useWidthAsHeight: false,
+    lanes: 1,
+    roadCondition:"dirt",
+    roadConditionInverted:true
+  },
+  hizLevha: {
+    isOnRoad: false,
+    roadTypes: withoutCurve,
+    width: CAR_WIDTH*2/3,
+    image: "hizLevha.png",
+    useWidthAsHeight: false,
+    lanes: 1,
+    roadCondition:"dirt",
+    roadConditionInverted:true
+  },
   yaya: {
     isOnRoad: true,
     roadTypes: withoutCurve,
@@ -1445,7 +1465,14 @@ export class MovableEntity extends Entity {
   entitySteeringMultiplier = STEERING_MULTIPLIER;
   entityminAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
-  entityMoveLimiter=1
+  customMoveLimiter=1 //0-1.0 arası olmak zorunda, hız sınırlamalarında kullanılacak
+  _entityMoveLimiter=1
+  get entityMoveLimiter(){
+    return Math.min(this._entityMoveLimiter,this.customMoveLimiter)
+  }
+  set entityMoveLimiter(value){
+    return this._entityMoveLimiter=value
+  }
   chosenAlgorithms = ["rule", "rule", "rule"];
   tick(dt) {
     this.velX += this.accX * dt;
@@ -1755,31 +1782,34 @@ export class Car extends MovableEntity {
     let freeSensors = sensors.filter(e=>e[1]==null)
     //nesne araçsa sağa gidecek şekilde arttırılabilir
     let increasers = [-2,-1,1,-3,1,-1,1,-1,1,-1]
-    if(allTriggered){
+    let sum = 0
+    sensors.forEach((e,i)=>{
+      if(e[0]<THRESHOLD/2){
+        sum+=increasers[i]
+      }
+    })
+    if(allFront){
       if(back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
         this.entityMoveLimiter=1
-        this.moveBackward(dt)
-        return true
+        let sumSign = Math.sign(sum)
+        this.steer(dt,-sumSign)
+        //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
+       if(this.getAlignment()<=0||this.absoluteVel()<5)this.moveBackward(dt)
+        return
       }
-    }else if(mainTriggered){
+    }
+    if(mainTriggered){
       if(sensors.find(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
-        let sum = 0
-        sensors.forEach((e,i)=>{
-          if(e[0]<THRESHOLD/2){
-            sum+=increasers[i]
-          }
-        })
         let sumSign = Math.sign(sum)
         this.steer(dt,sumSign)
         if(sumSign!=this.laneMultiplier)this.switchLane()
         this.stuckTick=bothTriggereed?this.tickCounter:0
         let lastLimiter = this.entityMoveLimiter
-        if(allFront)this.entityMoveLimiter=Math.max(bothTriggereed?0:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
-        if(this.entityMoveLimiter==0||lastLimiter){
-
+        if(allFront){
+          this.brake(dt)
+          this.entityMoveLimiter=Math.max(bothTriggereed?0.1:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
         }
       }
-    }else if(this.laneMultiplier==-1){
     }
     return true
 
@@ -1894,6 +1924,7 @@ export class Car extends MovableEntity {
     
     let hasPassedStart =!isTurning||(!relativeToCurr.find(e=>Math.abs(e/THRESHOLD)>3))
     let roadDistanceMultiplier = isTurning?1:1
+    if(relativeTurningDirection=="left")roadDistanceMultiplier-=0.2
     let hasCompletedCurrentRoad = distanceToNext<ROAD_WIDTH*roadDistanceMultiplier
     let midGoal = [(this.path[0][0]*0.8+this.path[1][0]*0.2),(this.path[0][1]*0.8+this.path[1][1]*0.2)]
     let useCurrent = isTurning&&!hasCompletedCurrentRoad
@@ -2371,7 +2402,6 @@ export class Obstacle extends MovableEntity {
       relY += relOffsetY;
       let index = [relOffsetY>0,relOffsetX>0,relOffsetY<0,relOffsetX<0].indexOf(true)
       this.relativeDirection=index>=0?connectionArray[index]:"right"
-      this.laneWhenRelativeSet=this.chosenLane
       this.direction = currentAngle;
     }
     let [resX, resY] = [this.parent.posX + relX, this.parent.posY - relY];
@@ -2956,7 +2986,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 6
+  wandererAmount = 7
   wanderers;
   resolveCollision=false
   lights=[]
@@ -3098,8 +3128,6 @@ export class Game {
     }));
   }
   setMapExtras(onlySpecified) {
-    //TODO:
-    //levha, engel vs. yerleştirilmesi
     let currentObstacles = this.obstacleAmounts;
     let amountRange = [this.minObstacles, this.maxObstacles];
     let minCounter = 0;
@@ -3148,8 +3176,8 @@ export class Game {
             //miktar rastgele seçiliyor ama seçilen tamamen kullanılabilmeli
             randomAmount = remainingAmount;
           } else {
-            //1-4 arası sayıya bölerek aralığın altına yakın değer seçiliyor, nesne çeşitliliği artmış oluyor
-            randomAmount = Math.floor((Math.random() * (remainingAmount - 1)) / (1 + Math.random() * 3)) + 1;
+            //1-3 arası sayıya bölerek aralığın altına yakın değer seçiliyor, nesne çeşitliliği artmış oluyor
+            randomAmount = Math.floor((Math.random() * (remainingAmount - 1)) / (1 + Math.random() * 2)) + 1;
           }
           remainingAmount -= randomAmount;
           remainingObstacles.splice(index, 1);
@@ -3197,12 +3225,15 @@ export class Game {
         let laneAmount = obstacle.usedLanes
         //engel yolun ortasına göre solda veya üstteyse diğer yöndedir (diğer yön=başlangıç yolunun (0,n) bakış açısından sol şeritten gelen yön)
         let isOtherDirection = obstacle.relativeDirection=="left"||obstacle.relativeDirection=="up"
+               //hız levhası için
+
+        //çift şeritte bulunan nesnelerden dolayı tek koşula alnmıyor
+        //bir engel için iki adet levha oluşturulabileceğinden iki koşulun ayrı ayrı da çalışabilmesi gerekiyor
         if(isOtherDirection||laneAmount==2){
           //engel sol şeritte, levhası sağda olmalı
           obstacle.setCompatibleSign(true,2)
           
         }
-        //bir engel için iki adet levha oluşturulabileceğinden iki koşulun ayrı ayrı da çalışabilmesi gerekiyor
        if(!isOtherDirection||laneAmount==2){
         //levhası solda olmalı
         obstacle.setCompatibleSign(false,2)
