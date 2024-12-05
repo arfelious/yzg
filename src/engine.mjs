@@ -184,7 +184,7 @@ const OBSTACLES = {
     roadCondition:"dirt",
     roadConditionInverted:true
   },
-  yaya: {
+  yayaGecidi: {
     isOnRoad: true,
     roadTypes: withoutCurve,
     width: CAR_WIDTH/2,
@@ -196,7 +196,7 @@ const OBSTACLES = {
     roadCondition:"dirt",
     roadConditionInverted:true
   },
-  yayaLevha: {
+  yayaGecidiLevha: {
     isOnRoad: false,
     roadTypes: withoutCurve,
     width: (CAR_WIDTH * 2) / 3,
@@ -1786,7 +1786,7 @@ export class Car extends MovableEntity {
     let increasers = [3.5,-2,3,-2,-1.5,1,-1.5,1,-1.5,1]
     let sum = 0
     sensors.forEach((e,i)=>{
-      if(e[0]<THRESHOLD/2){
+      if(e[0]<THRESHOLD/2&&(!e[1]||e[1].entityType=="yayaGecidi")){
         sum+=increasers[i]
       }
     })
