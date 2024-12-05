@@ -83,7 +83,9 @@ let changeImageResolution = async (texture, options) => {
     };
   });
 };
-const THREATS = ["rogar","bariyer","cukur","car"]
+const THREATS = ["rogar","bariyer","cukur","car","road"]
+const REAL_THREATS = ["rogar","bariyer","cukur","car"]
+
 const PHYSICAL_THREATS = ["bariyer","car"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
@@ -1400,7 +1402,7 @@ class Entity {
     }
     if (this.isImmovable) {
       this.sprite.angle = this.direction;
-    } else {
+    } else if(!this.destroyed){
       this.cachedLines = null;
       let lastGrids = this.currentGrids
       this.currentGrids = this.getGrids();
@@ -1784,12 +1786,11 @@ export class Car extends MovableEntity {
     let sensors = this.sensors.slice(0,10).map(e=>e.output)
     let back = this.sensors.slice(-2).map(e=>e.output)
     const THRESHOLD = 80
-    let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&THREATS.includes(sensors[0][1].entityType)
-    let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&THREATS.includes(sensors[1][1].entityType)
+    let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&(sensors[0][1].entityType=="road"?sensors[0][0]<40:REAL_THREATS.includes(sensors[0][1].entityType))
+    let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&(sensors[1][1].entityType=="road"?sensors[1][0]<40:REAL_THREATS.includes(sensors[1][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
-    //nesne araçsa sağa gidecek şekilde arttırılabilir
     //yavaşlamanın koşulları arttırılmalı
     let increasers = [1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
     let sum = 0
@@ -1802,7 +1803,7 @@ export class Car extends MovableEntity {
     if(mainTriggered){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-      let backSensorsFree = back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))
+      let backSensorsFree = back.every(e=>e[1]==null||!REAL_THREATS.includes(e[1].entityType))
       if(backSensorsFree&&(this.getAlignment()<=0||absVelocity<5)){
         this.entityMoveLimiter=1
         this.moveBackward(dt)
@@ -1812,12 +1813,13 @@ export class Car extends MovableEntity {
         this.moveForward(dt)
         this.steer(dt,sumSign*2)
         if(sumSign!=this.laneMultiplier){
-          this.switchLane()
+          //this.switchLane()
         }
       }
       return
       
     }
+    this.entityMoveLimiter=1
     return true
 
   }
@@ -3000,14 +3002,13 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 6
+  wandererAmount = 20
   wanderers;
   resolveCollision=false
   lights=[]
   cars=[]
   gridEntitySets
   synchronizeLights(){
-    //bura
     let lightToLightAverage = []
     if(this.lights.length==1){
       this.lights[0].sync(DEFAULT_LIGHT_DISTANCE,0)
