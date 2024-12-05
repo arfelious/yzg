@@ -167,7 +167,7 @@ const OBSTACLES = {
   hiz: {
     isOnRoad: false,
     roadTypes: withoutCurve,
-    width: CAR_WIDTH,
+    width: CAR_WIDTH*3/4,
     image: "hiz.png",
     useWidthAsHeight: false,
     lanes: 1,
@@ -1518,7 +1518,7 @@ export class MovableEntity extends Entity {
       this.accY = 0;
     }
     if (this.isAutonomous) {
-      if (this.tickCounter % this.actionInterval == 0) {
+      if (this.tickCounter % this.actionInterval == 0||this.lastActionType=="goal") {
         let currAction = this.getAction();
         this.lastAction = currAction;
       }
@@ -1766,10 +1766,9 @@ export class Car extends MovableEntity {
   checkThreatCondition(){
     return this.checkSensor(THREATS,90,this.sensors.slice(0,4))
   }
-  stuckTick=0
   _threatAction(dt){
     if(!this.checkThreatCondition())return true
-    let sensors = this.sensors.slice(0,4).concat(this.sensors.slice(6,12)).map(e=>e.output)
+    let sensors = this.sensors.slice(0,10).map(e=>e.output)
     let back = this.sensors.slice(-2).map(e=>e.output)
     const THRESHOLD = 120
     let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&THREATS.includes(sensors[0][1].entityType)
@@ -1777,38 +1776,43 @@ export class Car extends MovableEntity {
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
     let triggered = sensors.map(e=>e[0]<THRESHOLD&&e[1])
+    //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
+    //temas edilemeyeecek şeyler filtrelenmeli
     let allFront = triggered.slice(0,4).every(e=>e)
     let allTriggered = triggered.every(e=>e)
     let freeSensors = sensors.filter(e=>e[1]==null)
+    let threatIsCar = sensors.find(e=>e&&e.entityType=="car")
     //nesne araçsa sağa gidecek şekilde arttırılabilir
-    let increasers = [-2,-1,1,-3,1,-1,1,-1,1,-1]
+    let increasers = [3.5,-2,3,-2,-1.5,1,-1.5,1,-1.5,1]
     let sum = 0
     sensors.forEach((e,i)=>{
       if(e[0]<THRESHOLD/2){
         sum+=increasers[i]
       }
     })
-    if(allFront){
+    if(threatIsCar)sum*=-1
+    let absVelocity = this.absoluteVel()
+    if(absVelocity==0||allFront||(mainTriggered&&sensors[0][0]<THRESHOLD/2&&sensors[1][0]<THRESHOLD/2)){
       if(back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
         this.entityMoveLimiter=1
         let sumSign = Math.sign(sum)
-        this.steer(dt,-sumSign)
         //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-       if(this.getAlignment()<=0||this.absoluteVel()<5)this.moveBackward(dt)
-        return
+        if(this.getAlignment()<=0||this.absVelocity<5)this.moveBackward(dt)
+        this.steer(dt,sumSign*2)
+      return
       }
     }
     if(mainTriggered){
       if(sensors.find(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
         let sumSign = Math.sign(sum)
-        this.steer(dt,sumSign)
-        if(sumSign!=this.laneMultiplier)this.switchLane()
-        this.stuckTick=bothTriggereed?this.tickCounter:0
-        let lastLimiter = this.entityMoveLimiter
-        if(allFront){
-          this.brake(dt)
-          this.entityMoveLimiter=Math.max(bothTriggereed?0.1:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
+        this.steer(dt,sumSign*1.5)
+        if(sumSign!=this.laneMultiplier){
+          this.switchLane()
         }
+      }
+      if(allFront){
+        if(this.entityMoveLimiter==1)this.brake(dt)
+        this.entityMoveLimiter=Math.max(bothTriggereed?0:0.4,this.entityMoveLimiter-this.absoluteVel()/100)
       }
     }
     return true
@@ -2088,16 +2092,16 @@ export class Car extends MovableEntity {
     this.drawBounds = createGraphics;
     this.sprite = spritePath;
     this.entityType = "car";
-    this.addSensor(-this.directionOffset - 10, 1.4, 20);
-    this.addSensor(-this.directionOffset + 10, 1.4, 20);
-    this.addSensor(-this.directionOffset - 25, 1.8, 20);
-    this.addSensor(-this.directionOffset + 25, 1.8, 20);
+    this.addSensor(-this.directionOffset - 10, 1.6, 10);
+    this.addSensor(-this.directionOffset + 10, 1.6, 10);
+    this.addSensor(-this.directionOffset - 25, 1.8, 10);
+    this.addSensor(-this.directionOffset + 25, 1.8, 10);
+    for (let i = 0; i < 3; i++) {
+      this.addSensor(this.directionOffset - 90 - i * 10, 0.7, i * 10);
+      this.addSensor(this.directionOffset + 90 + i * 10, 0.7, i * 10);
+    }
     this.addSensor(this.directionOffset - 10, 0.5);
     this.addSensor(this.directionOffset + 10, 0.5);
-    for (let i = 0; i < 3; i++) {
-      this.addSensor(this.directionOffset + 90 + i * 10, 0.7, i * 10);
-      this.addSensor(this.directionOffset - 90 - i * 10, 0.7, i * 10);
-    }
     this.game.cars.push(this);
   }
 }
@@ -2340,6 +2344,7 @@ export class Obstacle extends MovableEntity {
   _relativeDirection
   laneWhenRelativeSet
   isOther=false
+  massMultiplier=1
   set relativeDirection(value){
     this._relativeDirection=value
     this.laneWhenRelativeSet=this.chosenLane
@@ -2486,6 +2491,7 @@ export class Obstacle extends MovableEntity {
     this.forcedDirection=forcedDirection
     let curr = OBSTACLES[obstacleType];
     this.entityType = obstacleType || "obstacle";
+    if(THREATS.includes(obstacleType))this.massMultiplier=20
     this.isOnRoad = !curr || curr.isOnRoad;
     if (!this.isOnRoad) this.isCollisionEffected = false;
     if (!curr) return;
@@ -2933,7 +2939,7 @@ let resolveAllCollisions = (elements, elasticity = 1, maxIterations = 10, correc
       hasCollisions = false;
       for (const [elm1, colliders] of elements) {
         for (const elm2 of colliders) {
-            if (elm2.isImmovable) continue;
+            if (!THREATS.includes(elm2.entityType)) continue;
             let absBounds1 = getAbsoluteBounds(elm1);
             let absBounds2 = getAbsoluteBounds(elm2);
             if (!isOverlapping(absBounds1, absBounds2))continue
@@ -2986,7 +2992,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 7
+  wandererAmount = 10
   wanderers;
   resolveCollision=false
   lights=[]
