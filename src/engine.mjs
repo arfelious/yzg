@@ -1408,7 +1408,9 @@ class Entity {
     }
   }
   destroy() {
-    this.resetGridSets(this.currentGrids)
+    let lastGrids = this.currentGrids
+    this.currentGrids=new Set()
+    this.resetGridSets(lastGrids)
     this.shouldDraw = false;
     this.destroyed = true;
     this.game.entities.splice(this.game.entities.indexOf(this), 1);
@@ -2998,7 +3000,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 10
+  wandererAmount = 6
   wanderers;
   resolveCollision=false
   lights=[]
