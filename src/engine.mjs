@@ -915,8 +915,6 @@ let noop = () => {};
 document.body.appendChild(app.canvas);
 app.canvas.style = "";
 app.canvas.id = "game";
-let entities = [];
-window.entities = entities;
 let toRadian = (x) => (x / 180) * Math.PI;
 let getMagnitude = Math.hypot;
 let toVector = (x) => [Math.cos(toRadian(x)), Math.sin(toRadian(x))];
@@ -1204,7 +1202,7 @@ class Entity {
     if (!this.isCollisionEffected) return [];
     let currLines = this.getLines();
     let currGrids = this.currentGrids;
-    return entities.filter(e=>{
+    return this.game.entities.filter(e=>{
       let cachedGrids = e.currentGrids;
       if (e == this || e.entityType == "sensor") return false;
       //normalde genişliğin yarısına bakmak yeterli olmalı ama nesnelerin anchor'ına bakmadan emin olunamıyor
@@ -1401,7 +1399,7 @@ class Entity {
   destroy() {
     this.shouldDraw = false;
     this.destroyed = true;
-    entities.splice(entities.indexOf(this), 1);
+    this.game.entities.splice(this.game.entities.indexOf(this), 1);
     if (this.sprite) this.sprite.destroy();
     if (this.childGraphics) {
       this.childGraphics.forEach(e=>e.destroy());
@@ -1413,8 +1411,8 @@ class Entity {
     this.tick=noop
   }
   constructor(game) {
-    entities.push(this);
     this.game = game;
+    this.game.entities.push(this);
   }
 }
 export class Sand extends Entity{
@@ -1770,7 +1768,7 @@ export class Car extends MovableEntity {
     if(!this.checkThreatCondition())return true
     let sensors = this.sensors.slice(0,10).map(e=>e.output)
     let back = this.sensors.slice(-2).map(e=>e.output)
-    const THRESHOLD = 120
+    const THRESHOLD = 80
     let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&THREATS.includes(sensors[0][1].entityType)
     let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&THREATS.includes(sensors[1][1].entityType)
     let mainTriggered = conditionFirst||conditionSecond
@@ -1790,22 +1788,23 @@ export class Car extends MovableEntity {
         sum+=increasers[i]
       }
     })
-    if(threatIsCar)sum*=-1
     let absVelocity = this.absoluteVel()
-    if(absVelocity==0||allFront||(mainTriggered&&sensors[0][0]<THRESHOLD/2&&sensors[1][0]<THRESHOLD/2)){
+    if(absVelocity<2||allFront||(mainTriggered&&sensors[0][0]<THRESHOLD*3/4&&sensors[1][0]<THRESHOLD*3/4)){
       if(back.every(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
         this.entityMoveLimiter=1
         let sumSign = Math.sign(sum)
         //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-        if(this.getAlignment()<=0||this.absVelocity<5)this.moveBackward(dt)
-        this.steer(dt,sumSign*2)
+        if(this.getAlignment()<=0||this.absVelocity<10){
+          this.moveBackward(dt)
+          this.steer(dt,sumSign*2)
+        }else this.steer(dt,-sumSign*2)
       return
       }
     }
     if(mainTriggered){
       if(sensors.find(e=>e[1]==null||!THREATS.includes(e[1].entityType))){
         let sumSign = Math.sign(sum)
-        this.steer(dt,sumSign*1.5)
+        this.steer(dt,-sumSign*1.5)
         if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
@@ -2836,7 +2835,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       acceleration = 80;
       drag = 6;
       turnDrag = 1.2;
-      alignment = 0.7;
+      alignment = 0.55;
       steering = 1.2;
       turnLimiters = [2.5, 1.25];
       break;
@@ -2844,7 +2843,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       acceleration = 80;
       drag = 4;
       turnDrag = 1.26;
-      alignment = 0.35;
+      alignment = 0.6;
       steering = 1.4;
       turnLimiters = [3.7, 1.25];
       break;
@@ -2992,7 +2991,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 10
+  wandererAmount = 6
   wanderers;
   resolveCollision=false
   lights=[]
@@ -3047,7 +3046,7 @@ export class Game {
   }
   tick(dt) {
     //Hareket hesaplaması başına çağrılıyor
-    entities.forEach((entity) => {
+    this.entities.forEach((entity) => {
       entity.tick(dt);
     });
     if(this.resolveCollision){
@@ -3058,7 +3057,7 @@ export class Game {
   }
   graphicsTick() {
     //Frame değişimi başına çağrılıyor
-    entities.forEach(e=>e.setGraphics());
+    this.entities.forEach(e=>e.setGraphics());
   }
   setMap() {
     this.map = pruneRoads(createMap());
@@ -3293,7 +3292,7 @@ export class Game {
     if (this.stage) {
       while (this.stage.children[0]) this.stage.removeChild(stage.children[0]);
     }
-    entities.forEach(e=>e.destroy());
+    this.entities.forEach(e=>e.destroy());
   }
   constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 30, minObstacles = 20) {
     this.minObstacles = minObstacles;
