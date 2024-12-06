@@ -1779,7 +1779,7 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(THREATS,100,this.sensors.slice(0,4))
+    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,100,this.sensors.slice(0,4))
   }
   _threatAction(dt){
     if(!this.checkThreatCondition())return true
@@ -1953,8 +1953,7 @@ export class Car extends MovableEntity {
     if (angleDifference > 180) {
         angleDifference -= 360;
     }
-    let steeringMultiplier = 1
-    if(currentMultiplier==-1)steeringMultiplier=1
+    let steeringMultiplier = 1.5
     if(Math.abs(angleDifference)>2){
       steeringMultiplier*=Math.sign(angleDifference)
       this.steer(dt,steeringMultiplier)
