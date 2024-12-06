@@ -128,7 +128,7 @@ const OBSTACLES = {
   bariyer: {
     isOnRoad: true,
     roadTypes: ["straight"],
-    width: CAR_WIDTH,
+    width: CAR_WIDTH*8/9,
     image: "bariyer.png",
     useWidthAsHeight: true,
     lanes: 1,
@@ -1583,7 +1583,7 @@ export class Car extends MovableEntity {
   isTurning = false;
   lastIsTurning = false;
   lastIsUsingBrake = false;
-  massMultiplier=10
+  massMultiplier=100
   isAccelerating=false
   lastPath
   allowSteer=false
@@ -1746,7 +1746,7 @@ export class Car extends MovableEntity {
     }
     return null;
   }
-  checkSensor(entityTypes,requiredDistance,sensors=this.sensors.slice(0,2),checkEvery){
+  checkSensor(entityTypes,requiredDistance,sensors=this.sensors.slice(1,3),checkEvery){
     //signature mantığı olmadığı için kullanıldığı kısımda okunurluğu arttırmak için değişimi burada yapıyoruz
     if(!Array.isArray(entityTypes))entityTypes=[entityTypes]
     let foundEntity
@@ -1772,52 +1772,62 @@ export class Car extends MovableEntity {
     let right = connectionArray[(connectionLookup[facingDirection]+1)%4]
     return this.currentRoad&&this.currentRoad.obstacles.find(e=>{
       let entity = e[0]
-      if(!entityTypes.includes(entity.entityType)||entity!=this.preventSign)return false
+      if(entity.isOnRoad)return false
+      if(entity==this.preventSign||!entityTypes.includes(entity.entityType))return false
       let absoluteSubgrid = getAbsoluteSubgridIndex(entity.subgridIndexes,entity.parent._direction)
       let directionList = getRelativeDirectionList([0,0],absoluteSubgrid)
       return directionList.includes(right)
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,100,this.sensors.slice(0,4))
+    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,80,this.sensors.slice(0,5))
   }
   _threatAction(dt){
     if(!this.checkThreatCondition())return true
-    let sensors = this.sensors.slice(0,10).map(e=>e.output)
+    let sensors = this.sensors.slice(0,11).map(e=>e.output)
     let back = this.sensors.slice(-2).map(e=>e.output)
-    const THRESHOLD = 80
-    let conditionFirst = sensors[0][1]&&sensors[0][0]<THRESHOLD&&(sensors[0][1].entityType=="road"?sensors[0][0]<40:REAL_THREATS.includes(sensors[0][1].entityType))
-    let conditionSecond = sensors[1][1]&&sensors[1][0]<THRESHOLD&&(sensors[1][1].entityType=="road"?sensors[1][0]<40:REAL_THREATS.includes(sensors[1][1].entityType))
+    let conditionFirst = sensors[1][1]&&(sensors[1][1].entityType=="road"?sensors[1][0]<40:sensors[1][0]<100&&REAL_THREATS.includes(sensors[1][1].entityType))
+    let conditionSecond = sensors[2][1]&&(sensors[2][1].entityType=="road"?sensors[2][0]<40:sensors[2][0]<100&&REAL_THREATS.includes(sensors[2][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
     //yavaşlamanın koşulları arttırılmalı
-    let increasers = [1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
+    let increasers = [0,1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
     let sum = 0
     sensors.forEach((e,i)=>{
       if(e[1]&&e[1].entityType!="yayaGecidi"){
         sum+=increasers[i]
       }
     })
+    let facingDirection = this.getFacingDirection()
+    let frontSensors = sensors.slice(0,5)
+    let frontTriggered = frontSensors.filter(e=>e[1])
+    let hasDominance = facingDirection=="left"||facingDirection=="down"
+    let hasDynamicThreat = sensors.find(e=>e[1]&&e[1].entityType=="car")
     let absVelocity = this.absoluteVel()
     if(mainTriggered){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-      let backSensorsFree = back.every(e=>e[1]==null||!REAL_THREATS.includes(e[1].entityType))
-      if(backSensorsFree&&(this.getAlignment()<=0||absVelocity<5)){
-        this.entityMoveLimiter=1
-        this.moveBackward(dt)
-        this.steer(dt,-sumSign*2)
+      let backSensorsFree = back.every(e=>e[1]==null||(e[0]>30&&!REAL_THREATS.includes(e[1].entityType)))
+      let freeBack = back.findIndex(e=>e[1]==null)
+      if(frontTriggered.length>=3&&(this.getAlignment()<=0||absVelocity<2)){
+        if(backSensorsFree||freeBack!=-1){
+          this.entityMoveLimiter=1
+          this.moveBackward(dt)
+          let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
+          this.steer(dt,currentSteeringMultiplier)
+        }
       }else{
-        this.entityMoveLimiter=Math.max(bothTriggereed?0:0.8,this.entityMoveLimiter-this.absoluteVel()/100)
-        this.moveForward(dt)
+        this.entityMoveLimiter=Math.max(frontSensors.every(e=>e[1]&&REAL_THREATS.includes(e[1].entityType))?0:0.8,this.entityMoveLimiter-this.absoluteVel()/100)
+        let canAct = hasDominance||!hasDynamicThreat
+        if(canAct)this.moveForward(dt)
+        else this.brake(dt)
         this.steer(dt,sumSign*2)
-        if(sumSign!=this.laneMultiplier){
-          //this.switchLane()
+        if(sumSign!=this.laneMultiplier&&canAct){
+          this.switchLane()
         }
       }
       return
-      
     }
     this.entityMoveLimiter=1
     return true
@@ -1834,7 +1844,7 @@ export class Car extends MovableEntity {
     return null;
   }
   checkLaneCondition(){
-    return this.checkSensor("road",20,[this.sensors[7],this.sensors[9]],true)
+    return this.checkSensor("road",20,[this.sensors[8],this.sensors[10]],true)
   }
   checkLightCondition(){
     let res = this.checkSensor("light",80)
@@ -1879,6 +1889,24 @@ export class Car extends MovableEntity {
     this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter-this.absoluteVel()/100)
     return true
   }
+  checkSpeedCondition(){
+    return this.checkSign(["hiz","hizLevha"])
+  }
+  _speedAction(dt){
+    let res = this.checkSpeedCondition()
+    if(!res)return true
+    let entity=res[0]
+    let entityType = entity.entityType
+    if(entityType=="hiz"){
+      this.customMoveLimiter=0.8
+
+    }else if(entityType=="hizLevha"){
+      this.customMoveLimiter=1
+
+    }
+    this.preventSign=entity
+    return true
+  }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
       if(this.checkLaneCondition()){
@@ -1889,6 +1917,9 @@ export class Car extends MovableEntity {
       }
       if(this.checkBumpCondition()){
         return this._bumpAction
+      }
+      if(this.checkSpeedCondition()){
+        return this._speedAction
       }
     }
     return null;
@@ -1953,7 +1984,7 @@ export class Car extends MovableEntity {
     if (angleDifference > 180) {
         angleDifference -= 360;
     }
-    let steeringMultiplier = 1.5
+    let steeringMultiplier = 1.2
     if(Math.abs(angleDifference)>2){
       steeringMultiplier*=Math.sign(angleDifference)
       this.steer(dt,steeringMultiplier)
@@ -2096,16 +2127,17 @@ export class Car extends MovableEntity {
     this.drawBounds = createGraphics;
     this.sprite = spritePath;
     this.entityType = "car";
-    this.addSensor(-this.directionOffset - 10, 1.6, 10);
-    this.addSensor(-this.directionOffset + 10, 1.6, 10);
+    this.addSensor(-this.directionOffset, 2.0, 10);
+    this.addSensor(-this.directionOffset - 10, 2.0, 10);
+    this.addSensor(-this.directionOffset + 10, 2.0, 10);
     this.addSensor(-this.directionOffset - 25, 1.8, 10);
     this.addSensor(-this.directionOffset + 25, 1.8, 10);
     for (let i = 0; i < 3; i++) {
       this.addSensor(this.directionOffset - 90 - i * 10, 0.7, i * 10);
       this.addSensor(this.directionOffset + 90 + i * 10, 0.7, i * 10);
     }
-    this.addSensor(this.directionOffset - 10, 0.5);
-    this.addSensor(this.directionOffset + 10, 0.5);
+    this.addSensor(this.directionOffset - 10, 0.7);
+    this.addSensor(this.directionOffset + 10, 0.7);
     this.game.cars.push(this);
   }
 }
@@ -3001,7 +3033,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 20
+  wandererAmount = 10
   wanderers;
   resolveCollision=false
   lights=[]
@@ -3060,7 +3092,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(this.globalColliders,1,10,0.01,0.0001)
+      resolveAllCollisions(this.globalColliders,0.01,300,0.001,0.0001)
     }
     this.globalColliders = new Set();
     this.tickCounter++;
