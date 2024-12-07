@@ -19,7 +19,7 @@ let currentStart =
 let roadOffsetY = currentStart * ROAD_WIDTH;
 let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
-mainCar.setPosition(80, 50 + roadOffsetY);
+mainCar.setPosition(80, 100 + roadOffsetY);
 //--------------------------------------------------
 // WASD Butonları
 const controlButtons = {
@@ -57,7 +57,6 @@ const ticker = PIXI.Ticker.system;
 window.ticker = ticker;
 window.stage = app.stage;
 window.app = app;
-//testing section, will be deleted
 let frameTimes = [];
 let isDown = {};
 window.addEventListener("keydown", (event) => {

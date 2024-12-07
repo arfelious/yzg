@@ -60,6 +60,7 @@ await app.init({
   autoDensity: true,
 });
 const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+const IS_PROD = true
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -872,7 +873,7 @@ export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getMinim
           leftConnections = leftConnections.filter(e=>e != forcedDirection);
         }
       }
-      let currminimumLength = Infinity;
+      let currMinimumLength = Infinity;
       let res = false;
       for (let i = 0; i < leftConnections.length; i++) {
         let curr = leftConnections[i];
@@ -881,8 +882,8 @@ export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getMinim
         if (tempRes) {
           if (!getMinimumDistance) return tempRes;
           let tempLength = tempRes.length;
-          if (tempLength < currminimumLength) {
-            currminimumLength = tempLength;
+          if (tempLength < currMinimumLength) {
+            currMinimumLength = tempLength;
             res = tempRes;
           }
         }
@@ -1000,8 +1001,8 @@ let getDistance = (x,y)=>getMagnitude(x[0]-y[0],x[1]-y[1])
 let toDegree = (x) => (x / Math.PI) * 180;
 let getBounds = (sprite) => {
   let extracted = app.renderer.extract.pixels(sprite);
-  let xmin = 255,
-    ymin = 255,
+  let xMin = 255,
+    yMin = 255,
     xMax = 0,
     yMax = 0;
   let pixels = extracted.pixels;
@@ -1015,16 +1016,16 @@ let getBounds = (sprite) => {
     let y = Math.floor(index / width);
     let a = pixels[i + 3];
     if (a > 200) {
-      if (x < xmin) xmin = x;
+      if (x < xMin) xMin = x;
       if (x > xMax) xMax = x;
-      if (y < ymin) ymin = y;
+      if (y < yMin) yMin = y;
       if (y > yMax) yMax = y;
     }
   }
   let retVal = [
-    [xmin, ymin],
-    [xmin, yMax],
-    [xMax, ymin],
+    [xMin, yMin],
+    [xMin, yMax],
+    [xMax, yMin],
     [xMax, yMax],
   ];
   return retVal;
@@ -1046,28 +1047,28 @@ let getAbsoluteBounds = (entity)=>{
       return [posX + rotatedX, posY + rotatedY];
   });
 }
-let getminsAndMaxes = bounds=>{
-  //sırasıyla xmin, xmax, ymin, ymax
+let getMinsAndMaxes = bounds=>{
+  //sırasıyla xMin, xMax, yMin, yMax
   let xValues = bounds.map(([x])=>x)
   let yValues = bounds.map(([_,y])=>y)
 
   return [Math.min(...xValues),Math.max(...xValues),Math.min(...yValues),Math.max(...yValues)]
 }
 let isOverlapping = (bounds1, bounds2)=>{
-  let [x1min,x1Max,y1min,y1Max]=getminsAndMaxes(bounds1)
-  let [x2min,x2Max,y2min,y2Max]=getminsAndMaxes(bounds2)
+  let [x1Min,x1Max,y1Min,y1Max]=getMinsAndMaxes(bounds1)
+  let [x2Min,x2Max,y2Min,y2Max]=getMinsAndMaxes(bounds2)
   return (
-      x1min < x2Max &&
-      x1Max > x2min &&
-      y1min < y2Max &&
-      y1Max > y2min
+      x1Min < x2Max &&
+      x1Max > x2Min &&
+      y1Min < y2Max &&
+      y1Max > y2Min
   );
 }
 let getOverlap=(bounds1, bounds2)=>{ //getBounds değil getAbsoluteBounds kullanılmalı
-  let [x1min,x1Max,y1min,y1Max]=getminsAndMaxes(bounds1)
-  let [x2min,x2Max,y2min,y2Max]=getminsAndMaxes(bounds2)
-  let dx = Math.min(x1Max, x2Max) - Math.max(x1min, x2min);
-  let dy = Math.min(y1Max, y2Max) - Math.max(y1min, y2min);
+  let [x1Min,x1Max,y1Min,y1Max]=getMinsAndMaxes(bounds1)
+  let [x2Min,x2Max,y2Min,y2Max]=getMinsAndMaxes(bounds2)
+  let dx = Math.min(x1Max, x2Max) - Math.max(x1Min, x2Min);
+  let dy = Math.min(y1Max, y2Max) - Math.max(y1Min, y2Min);
   return { dx, dy };
 }
 export let arrayEquals = (arr1, arr2) => {
@@ -1193,6 +1194,7 @@ class Entity {
     return connectionArray[this.getAngleIndex()];
   }
   getRelevantEntities(){
+    // array'deki harita sınırı dahilindeki her set array'e çevriliyor, array içinde array olmaması için düzleştiriliyor
     return this.currentGridsArray.filter(inBounds).map(e=>[...this.game.gridEntitySets[e[0]][e[1]]]).flat()
   }
   getColliders() {
@@ -1478,7 +1480,7 @@ export class MovableEntity extends Entity {
   entityDrag = DRAG;
   entityTurnDrag = TURN_DRAG;
   entitySteeringMultiplier = STEERING_MULTIPLIER;
-  entityminAlignment = MIN_ALIGNMENT;
+  entityMinAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
   customMoveLimiter=1 //0-1.0 arası olmak zorunda, hız sınırlamalarında kullanılacak
   _entityMoveLimiter=1
@@ -1645,11 +1647,11 @@ export class Car extends MovableEntity {
     let BC = this.getLines()[1];
     return [(BC[0][0] + BC[1][0]) / 2, (BC[0][1] + BC[1][1]) / 2];
   }
-  setPath(value, isWrongDirection = false) {
-    this.path = value;
+  setPath(path, isWrongDirection = false) {
+    this.path = path;
     this.isWrongDirection = isWrongDirection;
     if(this.isWandering)return
-    let startIndex = drawPath(this.game.roads, value);
+    let startIndex = drawPath(this.game.roads, path);
     if (startIndex === undefined) return;
     let roadIndexes = this.path.length < 3 ? this.path[this.path.length - 1] : this.path[1];
     let currRoad = this.game.roads[roadIndexes[0]][roadIndexes[1]];
@@ -1780,10 +1782,12 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,80,this.sensors.slice(0,5))
+    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
   }
+  stationaryAt=0
   _threatAction(dt){
     if(!this.checkThreatCondition())return true
+    let now = Date.now()
     let sensors = this.sensors.slice(0,11).map(e=>e.output)
     let back = this.sensors.slice(-2).map(e=>e.output)
     let conditionFirst = sensors[1][1]&&(sensors[1][1].entityType=="road"?sensors[1][0]<40:sensors[1][0]<100&&REAL_THREATS.includes(sensors[1][1].entityType))
@@ -1794,42 +1798,68 @@ export class Car extends MovableEntity {
     //yavaşlamanın koşulları arttırılmalı
     let increasers = [0,1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
     let sum = 0
+    let weightedSum = 0
     sensors.forEach((e,i)=>{
       if(e[1]&&e[1].entityType!="yayaGecidi"){
         sum+=increasers[i]
+        weightedSum+=increasers[i]*(1-e[0]/this.sensors[i].length)
       }
     })
+    let angleDifference = this.getGoalAngle()
+    if(typeof angleDifference==="num")sum+=Math.sign(angleDifference)*3
     let facingDirection = this.getFacingDirection()
     let frontSensors = sensors.slice(0,5)
     let frontTriggered = frontSensors.filter(e=>e[1])
-    let hasDominance = facingDirection=="left"||facingDirection=="down"
+    let hasDominance = facingDirection=="right"||facingDirection=="up"
     let hasDynamicThreat = sensors.find(e=>e[1]&&e[1].entityType=="car")
+    let carIsComing = hasDynamicThreat
+    if(carIsComing){
+      let otherCar = hasDynamicThreat[1]
+      let speedAlignment = dotProduct(toUnitVector([this.velX,this.velY]),toUnitVector([otherCar.velX,otherCar.velY]))
+      carIsComing=speedAlignment<-0.3
+    }
     let absVelocity = this.absoluteVel()
+    let allNonPhysical = sensors.every(e=>!e[1]||!REAL_THREATS.includes(e[1].entityType))
+    let frontPossible = frontSensors.filter(e=>e[0]>40).length>Math.floor(frontSensors.length/2)
+    let frontTooClose = frontSensors.filter(e=>e[0]<30).length>Math.floor(frontSensors.length/2)
+    let movedBackwards = false
     if(mainTriggered){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
       let backSensorsFree = back.every(e=>e[1]==null||(e[0]>30&&!REAL_THREATS.includes(e[1].entityType)))
       let freeBack = back.findIndex(e=>e[1]==null)
       if(frontTriggered.length>=3&&(this.getAlignment()<=0||absVelocity<2)){
-        if(backSensorsFree||freeBack!=-1){
+        //araç kendine doğru gelmiyorsa en erken 0.1 saniye sonra geri gidebiliyor
+        if((carIsComing||now-this.stationaryAt>100)&&(backSensorsFree||freeBack!=-1)){
           this.entityMoveLimiter=1
           this.moveBackward(dt)
           let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
-          this.steer(dt,currentSteeringMultiplier)
+          this.allowSteer=true
+          this.steer(dt,currentSteeringMultiplier,true)
+          movedBackwards=true
+        }else if(frontTriggered.length==3&&!frontTooClose){
+          this.entityMoveLimiter=0.3
+          let canAct = !hasDynamicThreat
+          let weightedSumSign = Math.sign(weightedSum)
+          if(canAct)this.moveForward(dt,0.5)
+          this.steer(dt,weightedSumSign*2)
         }
       }else{
-        this.entityMoveLimiter=Math.max(frontSensors.every(e=>e[1]&&REAL_THREATS.includes(e[1].entityType))?0:0.8,this.entityMoveLimiter-this.absoluteVel()/100)
+        let minimum = frontSensors.every(e=>frontTooClose||e[1]&&REAL_THREATS.includes(e[1].entityType))?frontPossible?0.2:0:carIsComing?0.4:0.6
+        this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
         let canAct = hasDominance||!hasDynamicThreat
         if(canAct)this.moveForward(dt)
         else this.brake(dt)
         this.steer(dt,sumSign*2)
-        if(sumSign!=this.laneMultiplier&&canAct){
+        if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
       }
-      return
+      //önceki hız 0 değilse ama yeni hız sıfırsa
+      if(absVelocity!=0&&this.absoluteVel()&&!movedBackwards)this.stationaryAt=now
+      return this.isMain
     }
-    this.entityMoveLimiter=1
+    if(allNonPhysical)this.resetChanged()
     return true
 
   }
@@ -1864,12 +1894,12 @@ export class Car extends MovableEntity {
       return true
     }
     let [dist,light] = res
-    if((light.state==LIGHT_STATES[0]&&dist<50)||(light.state==LIGHT_STATES[1]&&dist>=20)){
+    if((light.state==LIGHT_STATES[0]&&dist<50)||(light.state==LIGHT_STATES[1]&&dist>=40)){
       this.entityMoveLimiter*=0.7
       this.brake(dt)
     }
     if(light.state==LIGHT_STATES[1]){
-      this.entityMoveLimiter=Math.max(0.5,this.entityMoveLimiter*0.9)
+      this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter*0.9)
       this.allowSteer=true
     }
     return true
@@ -1887,17 +1917,19 @@ export class Car extends MovableEntity {
       this.entityMoveLimiter=(1+this.entityMoveLimiter)/2
     }
     this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter-this.absoluteVel()/100)
+    this.customMoveLimiter=1
     return true
   }
   checkSpeedCondition(){
-    return this.checkSign(["hiz","hizLevha"])
+    return this.checkSign(["hiz","hizLevha","kasisLevha"])
   }
   _speedAction(dt){
     let res = this.checkSpeedCondition()
     if(!res)return true
     let entity=res[0]
     let entityType = entity.entityType
-    if(entityType=="hiz"){
+    //hiz aslında hız sınırı levhası, hizLevha ise hız sınırının kaldırıldığını gösteriyor
+    if(entityType=="hiz"||entityType=="kasisLevha"){
       this.customMoveLimiter=0.8
 
     }else if(entityType=="hizLevha"){
@@ -1909,7 +1941,7 @@ export class Car extends MovableEntity {
   }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
-      if(this.checkLaneCondition()){
+      if(this.isMain&&this.checkLaneCondition()){
         return this._laneAction
       }
       if(this.checkLightCondition()){
@@ -1930,8 +1962,7 @@ export class Car extends MovableEntity {
     }
     return null;
   }
-
-  _getGoalAction(dt) {
+  getGoalAngle(){
     if (!this.path || this.path.length<2){
       if(this.isWandering){
         this.goal=null
@@ -1959,9 +1990,7 @@ export class Car extends MovableEntity {
     let relativeTurningDirection = connectionArray[(connectionLookup[goalDirection]-connectionLookup[lastDirection]+4)%4]
     let isTurning = lastDirection!=goalDirection
     let isNowTurning = facingDirection!=goalDirection
-    let willTurn = nextDirection != facingDirection ? -1 : 1;
     const THRESHOLD = ROAD_WIDTH/4
-    
     let hasPassedStart =!isTurning||(!relativeToCurr.find(e=>Math.abs(e/THRESHOLD)>3))
     let roadDistanceMultiplier = isTurning?1:1
     if(relativeTurningDirection=="left")roadDistanceMultiplier-=0.2
@@ -1978,6 +2007,12 @@ export class Car extends MovableEntity {
     let dy = targetY - this.posY;
     let angleToTarget = toDegree(Math.atan2(dy, dx)); // Hedef açısı
     let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
+    return angleDifference
+  }
+  _getGoalAction(dt) {
+    let angleResult = this.getGoalAngle()
+    if(typeof angleResult==="boolean")return angleResult
+    let angleDifference = angleResult
     if(this.isMain){
       //console.log(lastDirection,facingDirection,nextDirection)
     }
@@ -2002,7 +2037,7 @@ export class Car extends MovableEntity {
     this.entityTurnDrag = turnDrag;
     this.entitySteeringMultiplier = steering;
     this.entityTurnLimiters = turnLimiters;
-    this.entityminAlignment = alignment;
+    this.entityMinAlignment = alignment;
   }
   tick(dt) {
     super.tick(dt);
@@ -2071,7 +2106,7 @@ export class Car extends MovableEntity {
     let currentMultiplier = this.entitySteeringMultiplier;
     let alignment = this.getAlignment();
     let isGoingBackwards = this.isGoingBackwards(alignment);
-    if (!this.allowSteer&&Math.abs(alignment) < ((this.entityminAlignment / this.absoluteVel()) * this.entityMoveMultiplier) / ((isGoingBackwards ? this.entityTurnLimiters[0] : this.entityTurnLimiters[1]) + (this.isUsingBrake ? 2 : 0))) return;
+    if (!this.allowSteer&&Math.abs(alignment) < ((this.entityMinAlignment / this.absoluteVel()) * this.entityMoveMultiplier) / ((isGoingBackwards ? this.entityTurnLimiters[0] : this.entityTurnLimiters[1]) + (this.isUsingBrake ? 2 : 0))) return;
     this.isTurning = true;
     currentMultiplier *= dt * 100;
     if (this.isUsingBrake) {
@@ -2936,11 +2971,11 @@ let clearPath = (roads) => {
   roads.forEach(e=>e.forEach(e=>e.highlightToggles.forEach((_, i) => e.toggleHighlight(i, false))));
 };
 let drawPath = (roads, currPath, clearPrevious = true) => {
+  if (!currPath) return;
+  if (currPath.length < 2) return;
   if (clearPrevious) {
     clearPath(roads);
   }
-  if (!currPath) return;
-  if (currPath.length < 2) return;
   let retVal;
   let lastRoadIndex = currPath[1];
   let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]];
@@ -3033,7 +3068,7 @@ export class Game {
   obstacleAmounts;
   possibleRoads = [];
   tickCounter = 0;
-  wandererAmount = 10
+  wandererAmount = IS_PROD?4:10
   wanderers;
   resolveCollision=false
   lights=[]
@@ -3048,7 +3083,7 @@ export class Game {
       lightToLightAverage[i]=[]
       this.lights.forEach((otherLight,j)=>{
         if(i==j)lightToLightAverage[i][j]=[0,[]]
-        let path=findPath(this.map,"ucs",light.parent.gridIndexes,otherLight.parent.gridIndexes)
+        let path=findPath(this.map,"UCS",light.parent.gridIndexes,otherLight.parent.gridIndexes)
         lightToLightAverage[i][j]=[getPathCost(this.map,path),this.path]
       })
     })
@@ -3188,8 +3223,8 @@ export class Game {
         currentObstacles[e] = val;
       }
       if (!(e in OBSTACLES_WITH_SIGN)) obstaclesArray.push([e, val]);
-      let [currmin, currMax] = val;
-      minCounter += currmin;
+      let [currMin, currMax] = val;
+      minCounter += currMin;
       maxCounter += currMax;
     }
     amountRange[0] = Math.max(minCounter, amountRange[0]);
@@ -3339,7 +3374,7 @@ export class Game {
     }
     this.entities.forEach(e=>e.destroy());
   }
-  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = 30, minObstacles = 20) {
+  constructor(stage, obstacleAmounts = {}, onlySpecified = false, maxObstacles = IS_PROD?24:12, minObstacles = IS_PROD?12:4) {
     this.minObstacles = minObstacles;
     this.maxObstacles = maxObstacles;
     this.obstacleAmounts = obstacleAmounts;
