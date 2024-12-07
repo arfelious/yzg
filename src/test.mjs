@@ -27,31 +27,30 @@ let arePathsEqual = (paths) => {
 }
 const algorithms = ["DFS", "UCS", "A*"];
 let findDifferent = ()=>{
-    let grid,randStart,randEnd,roadEquals
+    let grid,randStart,randEnd,pathCondition
     do {
-    grid = createMap(),randStart=getRandom(grid),randEnd=getRandom(grid);
-    let paths = algorithms.map(algorithm => findPath(grid, algorithm, randStart, randEnd));
-    const dfsPath = paths[0];
-    const ucsPath = paths[1];
-    const aStarPath = paths[2];
+        grid = createMap(),randStart=getRandom(grid),randEnd=getRandom(grid);
+        let paths = algorithms.map(algorithm => findPath(grid, algorithm, randStart, randEnd));
+        const dfsPath = paths[0];
+        const ucsPath = paths[1];
+        const aStarPath = paths[2];
+        const ucsEqualsAStar = arePathsEqual([ucsPath, aStarPath]);
+        const dfsDifferent = !arePathsEqual([dfsPath, aStarPath]);
+        pathCondition = !ucsEqualsAStar||!dfsDifferent;
 
-    const ucsEqualsAStar = arePathsEqual([ucsPath, aStarPath]);
-    const dfsDifferent = !arePathsEqual([dfsPath, aStarPath]);
-
-    roadEquals = !(ucsEqualsAStar && dfsDifferent);
-
-    console.log("Başlangıç:", randStart, "Bitiş:", randEnd);
-    console.log("DFS Yolu:", dfsPath);
-    console.log("UCS Yolu:", ucsPath);
-    console.log("A* Yolu:", aStarPath);
-    console.log("A* == UCS:", ucsEqualsAStar, "DFS != A*:", dfsDifferent);
-    } while (roadEquals);
+        console.log("Başlangıç:", randStart, "Bitiş:", randEnd);
+        console.log("DFS Yolu:", dfsPath);
+        console.log("UCS Yolu:", ucsPath);
+        console.log("A* Yolu:", aStarPath);
+        console.log("A* == UCS:", ucsEqualsAStar, "DFS != A*:", dfsDifferent);
+    } while (pathCondition);
     return [grid,randStart,randEnd]
 }
 if(CREATE_TEST){
     window.testResult=findDifferent()
+    console.log("copy(JSON.stringify(testResult) yazarak sonuç kopyalanabilir")
 }else{
-    let testData = [[[[0,0,2,3],[3,90,0,2],[1,180,0,3],[0,270,0,0],[2,180,0,2],[1,270,0,2]],[[0,180,0,3],[3,180,0,2],[0,180,0,3],[3,270,0,0],[2,270,0,2],[2,0,0,2]],[[0,180,0,1],[3,0,0,1],[1,270,0,1],[2,180,0,0],[0,0,1,1],[3,180,0,1]],[[0,180,0,2],[1,180,0,2],[1,90,0,1],[2,0,2,0],[1,0,0,2],[1,180,0,2]],[[1,270,0,2],[-1,-1],[1,0,0,0],[1,180,2,0],[1,90,0,2],[0,0,0,2]],[[2,270,0,1],[0,0,0,1],[3,270,0,0],[2,90,1,1],[0,0,1,1],[0,0,0,1]],[[-1,-1],[-1,-1],[0,270,1,0],[1,90,2,1],[1,270,2,1],[-1,-1]],[[-1,-1],[-1,-1],[1,90,1,0],[0,0,2,0],[3,90,0,0],[2,90,0,0]]],[4,2],[0,5]]
+    let testData = [[[[0,0,0,1],[1,270,2,1],[0,90,0,0],[1,90,0,2],[3,0,0,1],[2,270,0,2]],[[0,0,0,2],[3,0,0,1],[3,0,0,0],[0,0,0,1],[1,180,0,1],[-1,-1]],[[2,90,0,0],[3,90,0,0],[1,180,0,0],[-1,-1],[1,0,2,1],[0,180,0,1]],[[0,270,0,1],[2,180,0,1],[0,0,2,2],[1,270,2,2],[0,90,2,1],[-1,-1]],[[1,180,0,1],[1,90,0,1],[0,180,0,1],[3,270,2,1],[1,180,1,1],[1,0,0,4]],[[0,0,0,3],[1,270,0,3],[-1,-1],[2,180,2,2],[0,0,1,3],[2,270,1,3]],[[0,0,0,2],[3,270,0,2],[0,0,2,2],[2,270,2,2],[0,0,2,2],[1,270,0,2]],[[-1,-1],[2,180,0,3],[1,270,0,4],[-1,-1],[-1,-1],[0,90,0,2]]],[2,0],[4,5]]
     let [grid,randStart,randEnd] = testData
     let paths = algorithms.map(algorithm => findPath(grid, algorithm, randStart, randEnd));
     const dfsPath = paths[0];
@@ -59,7 +58,7 @@ if(CREATE_TEST){
     const aStarPath = paths[2];
     const ucsEqualsAStar = arePathsEqual([ucsPath, aStarPath]);
     const dfsDifferent = !arePathsEqual([dfsPath, aStarPath]);
-    let roadEquals = ucsEqualsAStar&&dfsDifferent
+    let pathCondition = ucsEqualsAStar&&dfsDifferent
     let errMessage = ""
     if(!ucsEqualsAStar){
         errMessage+="UCS: "+JSON.stringify(ucsPath)
@@ -71,5 +70,5 @@ if(CREATE_TEST){
         errMessage+=" == "
         errMessage+="A*: "+JSON.stringify(aStarPath)
     }
-    if(!roadEquals)throw "Yol bulma test verisi hatalı:\n"+errMessage
+    console.assert(pathCondition,"Yol bulma test verisi hatalı:\n"+errMessage)
 }
