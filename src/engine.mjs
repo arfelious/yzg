@@ -80,7 +80,7 @@ let changeImageResolution = async (texture, options) => {
 const THREATS = ["rogar","bariyer","cukur","car","road"]
 const REAL_THREATS = ["rogar","bariyer","cukur","car"]
 
-const PHYSICAL_THREATS = ["bariyer","car"]
+const PHYSICAL_THREATS = ["car"]
 const NONPHYSICAL_THREATS = ["yayaGecidi","light","kasis"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
@@ -1587,6 +1587,8 @@ export class Car extends MovableEntity {
   allowSteer=false
   isOverriden=false
   isWaiting=false
+  dominanceFactor=Math.random() //buna göre yol verecekler
+  preventGoal=false
   set isWandering(value) {
     this._isWandering = value;
   }
@@ -1675,8 +1677,8 @@ export class Car extends MovableEntity {
   }
   resetPath() {
     if (this.goal) {
-      let indexes = getIndexes(this.goal[0], this.goal[1]);
-      if (arrayEquals(this.gridIndexes, indexes)) {
+      let goalIndexes = getIndexes(this.goal[0], this.goal[1]);
+      if (arrayEquals(this.gridIndexes, goalIndexes)) {
         this.removeGoal();
         return;
       }
@@ -1780,7 +1782,7 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
+    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,120,this.sensors.slice(0,5))
   }
   checkBackThreat(){
       return this.checkSensor("car",100,this.sensors.slice(-2))
@@ -1799,7 +1801,7 @@ export class Car extends MovableEntity {
     sensors.forEach((e,i)=>{
       if(e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType)){
         sum+=increasers[i]
-        weightedSum+=increasers[i]*(1-e[0]/this.sensors[i].length)
+        weightedSum+=(i==0?0:i%2==0?-1:1)*(1-e[0]/CAR_WIDTH/2) // kendi uzunluklarını göre değil sabit bir değere göre normalleştiriliyorlar çünkü boş mesafe lazım
       }else sum-=increasers[i]/10
     })
     return [sum,weightedSum]
@@ -1820,11 +1822,12 @@ export class Car extends MovableEntity {
     let [sum,weightedSum] = this.getSensorSums()
     let angleDifference = this.getGoalAngle()
     if(typeof angleDifference==="number")sum+=Math.sign(angleDifference)
-    let facingDirection = this.getFacingDirection()
     let frontSensors = sensors.slice(0,5)
     let frontTriggered = frontSensors.filter(e=>e[1])
-    let hasDominance = facingDirection=="right"||facingDirection=="up"
-    let hasDynamicThreat = sensors.find(e=>e[1]&&e[1].entityType=="car")
+    let threatCars = sensors.filter((e,i)=>i<4&&e[1]&&e[1].entityType=="car"&&e[1].absoluteVel()>10)
+    let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
+    let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
+    let hasDynamicThreat = threatCars[0]
     let carIsComing = hasDynamicThreat
     let otherCar
     let directionAlignment = 0
@@ -1836,44 +1839,42 @@ export class Car extends MovableEntity {
     }
     let absVelocity = this.absoluteVel()
     let allNonPhysical = sensors.every(e=>!e[1]||!REAL_THREATS.includes(e[1].entityType))
-    let frontPossible = frontSensors.filter(e=>e[0]>40).length>Math.floor(frontSensors.length/2)
-    let frontTooClose = frontSensors.filter(e=>e[0]<40).length>Math.floor(frontSensors.length/2)
-    let movedBackwards = false
+    let frontPossible = frontSensors.filter(e=>e[0]>25).length>1
+    let frontTooClose = frontSensors.filter(e=>e[0]<30).length>Math.floor(frontSensors.length/2)
+    if(absVelocity>10&&!this.isGoingBackwards())this.stationaryAt=now
     if(otherCar&&otherCar.isWaiting)this.isWaiting=true
-    if(mainTriggered||absVelocity<1){
+    if(mainTriggered||absVelocity<1||this.isGoingBackwards()){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-      let backSensorsFree = back.every(e=>e[1]==null||(e[0]>30&&!REAL_THREATS.includes(e[1].entityType)))
+      let backSensorsFree = back.every(e=>e[0]>25||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let freeBack = back.findIndex(e=>e[1]==null)
-      if((now-this.stationaryAt>1000||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
-        //araç kendine doğru gelmiyorsa en erken 0.2 saniye sonra geri gidebiliyor
+      if((now-this.stationaryAt>300||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
+        //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         let weightedSumSign = Math.sign(weightedSum)
-        if(((carIsComing||now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
+        this.allowSteer=this.path&&this.path.length>0
+        if(((now-this.stationaryAt>300)&&(backSensorsFree||freeBack!=-1))){
           this.entityMoveLimiter=1
           this.moveBackward(dt)
-          let currentSteeringMultiplier=backSensorsFree?-weightedSumSign:freeBack==0?-2:2
-          this.allowSteer=true
+          let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
           this.steer(dt,currentSteeringMultiplier*1.25,true)
-          movedBackwards=true
-        }else if(!frontTooClose){
+        }else if(frontPossible){
           this.entityMoveLimiter=0.3
           let canAct = !hasDynamicThreat
           if(canAct)this.moveForward(dt,0.5)
           this.steer(dt,weightedSumSign*1.5)
         }
       }else{
-        let minimum = frontSensors.every(e=>frontTooClose||e[1]&&REAL_THREATS.includes(e[1].entityType))?frontPossible?0.2:0:carIsComing?0.4:0.6
+        let minimum = frontTooClose?frontPossible?0.2:0:carIsComing?0.4:0.6
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
-        let canAct = hasDominance||!hasDynamicThreat||directionAlignment>0.5
-        if(canAct)this.moveForward(dt)
-        else this.brake(dt)
+        let canAct = hasDominance||!hasDynamicThreat
+        if(canAct&&frontPossible&&!frontTooClose)this.moveForward(dt)
+        if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
         this.steer(dt,sumSign*1.5)
         if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
       }
       //önceki hız 0 değilse ama yeni hız sıfırsa
-      if(absVelocity!=0&&this.absoluteVel()==0&&!movedBackwards)this.stationaryAt=now
       return this.isMain
     }
     if(allNonPhysical)this.resetChanged()
@@ -1978,6 +1979,7 @@ export class Car extends MovableEntity {
     return null;
   }
   getGoalAction(chosenAlgorithm) {
+    if(this.preventGoal)return null
     if (this.isWandering||this.path && this.path.length > 0) {
       return this._getGoalAction;
     }
@@ -2116,7 +2118,7 @@ export class Car extends MovableEntity {
   moveBackward(dt = 1, scale = 1,setOverride=false) {
     this.accelerate(dt * 1000, -scale / 2,setOverride);
   }
-  isGoingBackwards(alignment = getAlignment()) {
+  isGoingBackwards(alignment = this.getAlignment()) {
     return alignment < 0;
   }
   steer(dt, angle,setOverride=false) {
@@ -2196,6 +2198,7 @@ export class Car extends MovableEntity {
 }
 export class MainCar extends Car {
   isMain = true;
+  dominanceFactor=0.5
   constructor(game, spritePath) {
     super(game, spritePath, true);
   }
@@ -3145,10 +3148,10 @@ export class Game {
 
   }
   createWanderer(fromEdge) {
-    let wanderer = new Car(this, "temp_car");
     let possibleRoads = fromEdge?this.possibleRoads.filter(e=>(this.roads[e[0]][e[1]].roadType!="rightcurve"&&(e[0]==0||e[0]==GRID_WIDTH-1||e[1]==0||e[1]==GRID_HEIGHT-1))&&!this.cars.find(car=>arrayEquals(car.gridIndexes,e))):
-      this.possibleRoads.slice(0)
+    this.possibleRoads.slice(0)
     if(!possibleRoads[0])return
+    let wanderer = new Car(this, "temp_car");
     let road = getRandom(possibleRoads)
     road = this.roads[road[0]][road[1]];
     wanderer.setPosition(road.posX, road.posY);
@@ -3408,13 +3411,15 @@ export class Game {
             noRoads=true
             break
           }
-          console.count("deneme")
           roadIndexes = remainingRoads[0];
           remainingRoads.splice(0,1)
           let succesful = light.setRoad(roadIndexes[0], roadIndexes[1])
           failed=!succesful
         }while(failed)
-        if(noRoads)break
+        if(noRoads){
+          light.destroy()
+          break
+        }
         let globalIndex = getAbsoluteGlobalSubgrid(light.parent,light.subgridIndexes)
         let subgridNeighbours = getNeighbours(globalIndex)
         let maxTries = 8

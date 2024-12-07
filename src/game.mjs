@@ -87,7 +87,12 @@ dropdowns.forEach((dropdown, index) => {
     }
   });
 });
-
+let preventGoalActionCheckbox = document.getElementById("prevent-goal")
+if(preventGoalActionCheckbox){
+  preventGoalActionCheckbox.addEventListener("change",()=>{
+    mainCar.preventGoal=!mainCar.preventGoal
+  })
+}
 app.canvas.onpointerup = (e) => {
   let rect = e.target.getBoundingClientRect();
   let scaleX = WIDTH / rect.width;
