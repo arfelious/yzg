@@ -1,5 +1,5 @@
 import {createMap,findPath} from "../src/engine.mjs";
-const CREATE_TEST = true
+const CREATE_TEST = false
 let getRandom =(grid) => {
     let x = Math.floor(Math.random() * grid.length);
     let y = Math.floor(Math.random() * grid[0].length);
@@ -37,7 +37,6 @@ let findDifferent = ()=>{
         const ucsEqualsAStar = arePathsEqual([ucsPath, aStarPath]);
         const dfsDifferent = !arePathsEqual([dfsPath, aStarPath]);
         pathCondition = ucsEqualsAStar&&dfsDifferent;
-        console.count("test")
         if(pathCondition){
             console.log("Başlangıç:", randStart, "Bitiş:", randEnd);
             console.log("DFS Yolu:", dfsPath);
