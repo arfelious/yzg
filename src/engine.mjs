@@ -59,7 +59,7 @@ await app.init({
   antialias: true,
   autoDensity: true,
 });
-const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+const IS_DEBUG = true; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
 const IS_PROD = true
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
@@ -371,6 +371,7 @@ let getPossibleSubgrids = (roadType, angle, isOnRoad) => {
       // yoldaysa engellenenleri, değilse engellenmeyenleri almalı
       // engellenmedi XOR isOnRoad ya da engellendi==isOnRoad
       // yapılabilir
+      //! değilini aldığı için !! boolean yapıyor
       let found = !!currBlocked.find(e=>arrayEquals(curr, e));
       if (found == isOnRoad) {
         retVal.push(curr);
@@ -1224,6 +1225,7 @@ class Entity {
     this.mass=this.mass??(this.width*this.height)*this.massMultiplier
     sprite.setSize(this.spriteWidth, this.height);
     sprite.anchor.set(this.anchorX, this.anchorY);
+    //! değilini aldığı için !! boolean yapıyor
     let hadSprite = !!this._sprite;
     this._sprite = sprite;
     if (hadSprite) return;
@@ -2206,7 +2208,7 @@ export class Road extends Entity {
     const ROAD = 50;
     const RATIO = GREEN / (GREEN + ROAD) / 2;
     let res = super.getLines();
-    let mapped = res.map((e, i) => e.map((e, j) => e.map((e, q) => e * (1 - RATIO) + res[(i + 2) % 4][+!j][q] * RATIO)));
+    let mapped = res.map((e, i) => e.map((e, j) => e.map((e, q) => e * (1 - RATIO) + res[(i + 2) % 4][1-j][q] * RATIO)));
     let retVal = [];
     let length = this.width || getMagnitude(res[0][0][0] - res[0][1][0], res[0][0][1] - res[0][1][1]);
     let lineLength = length * RATIO;
