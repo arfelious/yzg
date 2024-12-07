@@ -51,8 +51,8 @@ Object.entries(controlButtons).forEach(([direction, button]) => {
 
 //--------------------------------------------------
 
-let randCar = new Car(game, "temp_car");
-randCar.setPosition(100, 100 + roadOffsetY);
+// let randCar = new Car(game, "temp_car");
+// randCar.setPosition(100, 100 + roadOffsetY);
 const ticker = PIXI.Ticker.system;
 window.ticker = ticker;
 window.stage = app.stage;
