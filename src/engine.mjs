@@ -59,7 +59,7 @@ await app.init({
   antialias: true,
   autoDensity: true,
 });
-const IS_DEBUG = true; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
 const IS_PROD = true
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
@@ -1796,6 +1796,7 @@ export class Car extends MovableEntity {
     let conditionSecond = sensors[2][1]&&(sensors[2][1].entityType=="road"?sensors[2][0]<40:sensors[2][0]<100&&REAL_THREATS.includes(sensors[2][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
+    //yolun ortasında yola dik kalanlara özel koşul
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
     //yavaşlamanın koşulları arttırılmalı
     let increasers = [0,1,-1,3,-2,-1.5,1,-1.5,1,-1.5,1,-1.5]
@@ -3305,11 +3306,9 @@ export class Game {
       //TODO: nesnelerin işaretlerinin eklenmesi
       if (hasSign) {
         //subgrid kontrolü göreli olmayan yönlere göre yapılacak
-        //sağ şeritte ise
         let laneAmount = obstacle.usedLanes
         //engel yolun ortasına göre solda veya üstteyse diğer yöndedir (diğer yön=başlangıç yolunun (0,n) bakış açısından sol şeritten gelen yön)
         let isOtherDirection = obstacle.relativeDirection=="left"||obstacle.relativeDirection=="up"
-               //hız levhası için
 
         //çift şeritte bulunan nesnelerden dolayı tek koşula alnmıyor
         //bir engel için iki adet levha oluşturulabileceğinden iki koşulun ayrı ayrı da çalışabilmesi gerekiyor
