@@ -199,6 +199,16 @@ const OBSTACLES = {
     roadCondition:"asphalt",
     roadConditionInverted:false
   },
+  puddle: {
+    isOnRoad: true,
+    roadTypes: withoutCurve,
+    width: (CAR_WIDTH * 2) / 3,
+    image: "birikinti.png",
+    useWidthAsHeight: false,
+    lanes: 1,
+    roadCondition:"slippery",
+    roadConditionInverted:false
+  },
 };
 const OBSTACLE_SIGNS = [];
 const OBSTACLES_WITH_SIGN = Object.fromEntries(Object.keys(OBSTACLES).filter(e=>{
@@ -1472,13 +1482,20 @@ export class MovableEntity extends Entity {
   isImmovable = false;
   isAutonomous = false;
   entityMoveMultiplier = MOVE_MULTIPLIER;
-  entityDrag = DRAG;
+  _entityDrag = DRAG;
   entityTurnDrag = TURN_DRAG;
   entitySteeringMultiplier = STEERING_MULTIPLIER;
   entityMinAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
   customMoveLimiter=1 //0-1.0 arası olmak zorunda, hız sınırlamalarında kullanılacak
+  customDragMultiplier=1
   _entityMoveLimiter=1
+  get entityDrag(){
+    return this._entityDrag*this.customDragMultiplier
+  }
+  set entityDrag(value){
+    return this._entityDrag=value
+  }
   get entityMoveLimiter(){
     return Math.min(this._entityMoveLimiter,this.customMoveLimiter)
   }
@@ -1723,6 +1740,7 @@ export class Car extends MovableEntity {
   resetChanged(){
     this.entityMoveLimiter=1
     this.laneMultiplier=1
+    this.customDragMultiplier=1
     this.isWaiting=false
   }
   getAction() {
@@ -1963,11 +1981,11 @@ export class Car extends MovableEntity {
     this.preventSign=entity
     return true
   }
-  checkPedAction(){
-    return this.checkSensor(["yayaGecidi","yaya"],150)
+  checkPedCondition(){
+    return this.checkSensor(["yayaGecidi","yaya"],100)
   }
   _pedAction(dt){
-    let res = this.checkSensor(["yayaGecidi","yaya"],150)
+    let res = this.checkPedCondition()
     if(!res)return true
     let [dist,entity] = res
     if(entity.entityType=="yaya"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
@@ -1978,9 +1996,18 @@ export class Car extends MovableEntity {
     }
     return true
   }
+  checkPuddleCondition(){
+    return this.checkSensor(puddle,20)
+  }
+  _puddleAction(dt){
+    let res = this.checkPuddleCondition()
+    if(!res)return true
+    this.customDragMultiplier=0.5
+    return true
+  }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
-      if(this.checkPedAction){
+      if(this.checkPedCondition){
         return this._pedAction
       }
       if(this.isMain&&this.checkLaneCondition()){
@@ -1994,6 +2021,9 @@ export class Car extends MovableEntity {
       }
       if(this.checkSpeedCondition()){
         return this._speedAction
+      }
+      if(this.checkPuddleCondition()){
+        return this._puddleAction
       }
     }
     return null;
@@ -2459,8 +2489,8 @@ export class Pedestrian extends MovableEntity{
       }
     }
     if(this.state=="waiting"){
-      //her frame 300'de 1 şansı olunca bir süre durup geçmeye başlamış oluyor
-      if(Math.random()*300<1){
+      //her frame düşük şansı olunca bir süre durup geçmeye başlamış oluyor
+      if(Math.random()*1000<1){
         this.state="passing"
       }
     }
@@ -2492,7 +2522,7 @@ export class Pedestrian extends MovableEntity{
   }
   constructor(game, parent, subgrid) {
     super(game);
-    this.width=30
+    this.width=25
     this.parent=parent
     this.entityType="pedestrian"
     this.sprite=getRandom(PEDESTRIANS)
