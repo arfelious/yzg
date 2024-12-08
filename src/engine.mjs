@@ -49,7 +49,7 @@ await app.init({
   autoDensity: true,
 });
 const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-const IS_PROD = false
+const IS_PROD = true
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -3222,13 +3222,6 @@ let getAbsoluteGlobalSubgrid = (road,subgridIndex)=>{
   let roadIndex = road.gridIndexes
   let absIndex = getAbsoluteSubgridIndex(subgridIndex,road._direction)
   return [roadIndex[0]*3+absIndex[0]+2,roadIndex[1]*3+absIndex[1]+2]
-}
-let globalSubgridToCoordinates = globalSubgrid=>{
-  let base = [Math.floor(globalSubgrid[0]/3),Math.floor(globalSubgrid[1]/3)]
-  let remainder = [(globalSubgrid[0]%3)-1,(globalSubgrid[1]%3)-1]
-  let retVal = [base[0]*ROAD_WIDTH+remainder[0]*ROAD_WIDTH/3,base[1]*ROAD_WIDTH+remainder[1]*ROAD_WIDTH/3]
-  console.log("io",globalSubgrid,retVal)
-  return retVal
 }
 export class Game {
   roads;
