@@ -19,7 +19,8 @@ let currentStart =
 let roadOffsetY = currentStart * ROAD_WIDTH;
 let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
-mainCar.setPosition(80, 100 + roadOffsetY);
+//aracı ortaya koyarak şeride girdiğini gösterebiliriz
+mainCar.setPosition(80, 75 + roadOffsetY);
 //--------------------------------------------------
 // WASD Butonları
 const controlButtons = {
