@@ -3,18 +3,13 @@
           model
           şerit takip düzeltme
           collision resolution
-          hız sınırlayan levha
           problemAmount kullanılacak, game içine kaydedilecek
     TODO:
           GENEL OPTİMİZASYON
-          bir yola aynı levhadan iki tane koyulmayacak
-          giriş menüsü, start ve test kısmı
+          yaya yön tutarsızlığı düzeltilecek
+          levha sınırlama kontrol edilecek
           kural tabanlı otonomun şerit kontrolü iyileştirilmeli
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
-          collision sadece nesnenin içinde bulunduğu ve temas ettiği grid'ler için kontrol edilmeli
-          road class'ı için getLines fonksiyonundaki kod tekrarı verimlilik düşürülmeden azaltılacak
-          yol bulucunun çizdiği yolun sonuna görünürlüğü arttırmak amacıyla daire eklenecek
-          findPath memoization
       MAYBE:
         budama
         model basıyor olsa da basılan butonlar WASD kısmında gösterilmeli
@@ -38,6 +33,7 @@ export const PATH_START_INDEX = 2;
 export const BUILDING_MULTIPLIER = 0.9;
 export const LIGHT_CHANGE_TICK = 700;
 export const DEFAULT_LIGHT_DISTANCE = 200
+export const PEDESTRIAN_MOVE_MULTIPLIER = 50
 export let highlightStyle = {
   color: 0x006699,
   width: 4,
@@ -53,7 +49,7 @@ await app.init({
   autoDensity: true,
 });
 const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-const IS_PROD = true
+const IS_PROD = false
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -77,10 +73,10 @@ let changeImageResolution = async (texture, options) => {
     };
   });
 };
-const THREATS = ["rogar","bariyer","cukur","car","road"]
-const REAL_THREATS = ["rogar","bariyer","cukur","car"]
+const THREATS = ["rogar","bariyer","cukur","car","road","pedestrian"]
+const REAL_THREATS = ["rogar","bariyer","cukur","car","pedestrian"]
 
-const PHYSICAL_THREATS = ["car"]
+const PHYSICAL_THREATS = ["car","pedestrian"]
 const NONPHYSICAL_THREATS = ["yayaGecidi","light","kasis"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
@@ -241,7 +237,8 @@ const LIGHT_IMAGES = ["k-ısık.png", "s-ısık.png", "y-ısık.png", "kapalı_�
 const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e, i) => [e, i]));
 const BUILDING_TOPS = ["bina_test.png","cati1.png"]
 const BUILDING_SIDES = ["bina_yan.png","bina1.png"]
-let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS];
+const PEDESTRIANS = ["yaya.png","yaya2.png","yaya3.png"]
+let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg","yaya.png", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS,  ...PEDESTRIANS];
 //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
 let intendedWidths = {
   "temp_car.png": [CAR_WIDTH, true],
@@ -255,6 +252,8 @@ let toScale = [...ROAD_IMAGES.map(e=>[e, false]),
   ...LIGHT_IMAGES.map(e=>[e, true]), ...OBSTACLE_IMAGES.map(e=>[e, OBSTACLE_IMAGE_TO_NAME[e][4]]),
   ...BUILDING_SIDES.map(e=>[e,false]),
   ...BUILDING_TOPS.map(e=>[e,false]),
+  ...PEDESTRIANS.map(e=>[e,true]),
+  
 
 ];
 toScale.forEach(e=>(intendedWidths[e[0]] = [ROAD_WIDTH, e[1] || false]));
@@ -1801,7 +1800,7 @@ export class Car extends MovableEntity {
     sensors.forEach((e,i)=>{
       if(e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType)){
         sum+=increasers[i]
-        weightedSum+=(i==0?0:i%2==0?-1:1)*(1-e[0]/CAR_WIDTH/2) // kendi uzunluklarını göre değil sabit bir değere göre normalleştiriliyorlar çünkü boş mesafe lazım
+        weightedSum+=(i==0?0:i%2==0?-1:1)*(1-e[0]/CAR_WIDTH/2) // kendi uzunluklarına göre değil sabit bir değere göre normalleştiriliyorlar çünkü boş mesafe lazım
       }else sum-=increasers[i]/10
     })
     return [sum,weightedSum]
@@ -1816,6 +1815,10 @@ export class Car extends MovableEntity {
     let conditionSecond = sensors[2][1]&&(sensors[2][1].entityType=="road"?sensors[2][0]<40:sensors[2][0]<100&&REAL_THREATS.includes(sensors[2][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
+    //threatCars i==4 içermeli mi
+    //isWaiting test
+    //yoldan çıkınca geri girme
+    // öne yakın yan sensörler de domininanceFactors'te olmalı
     //yolun ortasında yola dik kalanlara özel koşul
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
     //yavaşlamanın koşulları arttırılmalı
@@ -1851,17 +1854,16 @@ export class Car extends MovableEntity {
       if((now-this.stationaryAt>300||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         let weightedSumSign = Math.sign(weightedSum)
-        this.allowSteer=this.path&&this.path.length>0
         if(((now-this.stationaryAt>300)&&(backSensorsFree||freeBack!=-1))){
           this.entityMoveLimiter=1
           this.moveBackward(dt)
           let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
-          this.steer(dt,currentSteeringMultiplier*1.25,true)
+          this.steer(dt,currentSteeringMultiplier*1.5,true)
         }else if(frontPossible){
           this.entityMoveLimiter=0.3
           let canAct = !hasDynamicThreat
           if(canAct)this.moveForward(dt,0.5)
-          this.steer(dt,weightedSumSign*1.5)
+          this.steer(dt,weightedSumSign*2)
         }
       }else{
         let minimum = frontTooClose?frontPossible?0.2:0:carIsComing?0.4:0.6
@@ -1869,7 +1871,7 @@ export class Car extends MovableEntity {
         let canAct = hasDominance||!hasDynamicThreat
         if(canAct&&frontPossible&&!frontTooClose)this.moveForward(dt)
         if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
-        this.steer(dt,sumSign*1.5)
+        this.steer(dt,sumSign*2)
         if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
@@ -1961,8 +1963,26 @@ export class Car extends MovableEntity {
     this.preventSign=entity
     return true
   }
+  checkPedAction(){
+    return this.checkSensor(["yayaGecidi","yaya"],150)
+  }
+  _pedAction(dt){
+    let res = this.checkSensor(["yayaGecidi","yaya"],150)
+    if(!res)return true
+    let [dist,entity] = res
+    if(entity.entityType=="yaya"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
+      this.customMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
+      this.brake(dt)
+    }else{
+      this.customMoveLimiter=Math.max(0.5,this.entityMoveLimiter-this.absoluteVel()/100)
+    }
+    return true
+  }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
+      if(this.checkPedAction){
+        return this._pedAction
+      }
       if(this.isMain&&this.checkLaneCondition()){
         return this._laneAction
       }
@@ -2416,6 +2436,90 @@ export class Road extends Entity {
     this.recursionIndex=recursionIndex
   }
 }
+export class Pedestrian extends MovableEntity{
+  rangeStart
+  rangeEnd
+  parent
+  state="waiting"
+  counter=0
+  anchorX=0.5
+  anchorY=0.5
+  getAlignment(){
+    return 1
+  }
+  tick(dt){
+    if(this.state=="turning"){
+      let startAngle = this.parent._direction
+      let goalAngle = startAngle+(this.counter%2==0?90:270)
+      let diff = getNormalizedAngle(this.direction-goalAngle)
+      this.direction+=Math.sign(diff)
+      if(Math.abs(diff)<3){
+        this.direction=goalAngle
+        this.state="waiting"
+      }
+    }
+    if(this.state=="waiting"){
+      //her frame 300'de 1 şansı olunca bir süre durup geçmeye başlamış oluyor
+      if(Math.random()*300<1){
+        this.state="passing"
+      }
+    }
+    if(this.state=="passing"){
+      let currentGoal = this.counter%2==0?this.rangeEnd:this.rangeStart
+      let distanceVector = [currentGoal[0]-this.posX,currentGoal[1]-this.posY]
+      let remaining = getMagnitude(distanceVector[0],distanceVector[1])
+      let remainingRatio = remaining/this.parent.width
+      let speed = 100
+      let directionVector = toUnitVector(distanceVector)
+      let gridIndexes = getIndexes(this.posX,this.posY)
+      let carsInGrid = Array.from(this.game.gridEntitySets[gridIndexes[0]]?.[gridIndexes[1]]||[]).filter(e=>e.entityType=="car")
+      if(!carsInGrid.find(e=>e.absoluteVel()>3)){
+        this.velX=directionVector[0]*speed*dt*PEDESTRIAN_MOVE_MULTIPLIER
+        this.velY=directionVector[1]*speed*dt*PEDESTRIAN_MOVE_MULTIPLIER
+        if(remainingRatio<0.03){
+          this.state="turning"
+          this.counter++
+          this.posX=currentGoal[0]
+          this.posY=currentGoal[1]
+          this.velX=0
+          this.velY=0
+          this.accX=0
+          this.accY=0
+        }
+      }
+    }
+    super.tick(dt)
+  }
+  constructor(game, parent, subgrid) {
+    super(game);
+    this.width=30
+    this.parent=parent
+    this.entityType="pedestrian"
+    this.sprite=getRandom(PEDESTRIANS)
+    let absoluteSubgrid = getAbsoluteSubgridIndex(subgrid,this.parent.parent._direction)
+    let directionVector = toUnitVector(absoluteSubgrid)
+    let offsetAxis = directionVector[0]==0?0:1
+    directionVector=[offsetAxis==0?1:0,offsetAxis==1?1:0].map(e=>e*ROAD_WIDTH*2/5)
+    let offsetMultiplier = [offsetAxis==0?-1:1,offsetAxis==1?-1:1]
+    let [midX,midY]=[this.parent.posX,this.parent.posY]
+    let offsetVector = [directionVector[0]*offsetMultiplier[0],directionVector[1]*offsetMultiplier[1]]
+    let offsetCoordsAmount = [directionVector[0],directionVector[1]]
+    let currentRangeStart = [midX+offsetCoordsAmount[0],midY+offsetCoordsAmount[1]]
+    let currentRangeEnd = [midX+offsetVector[0],midY+offsetVector[1]]
+    let assignFrom
+    if(Math.round(Math.random())==1){
+      assignFrom=[currentRangeStart,currentRangeEnd]
+    }else {
+      assignFrom=[currentRangeEnd,currentRangeStart];
+      this.directionOffset=270
+    }
+    [this.rangeStart,this.rangeEnd]=assignFrom
+    let startAngle = this.parent._direction
+    let goalAngle = startAngle+(this.counter%2==0?90:270)
+    this.direction=goalAngle
+    this.setPosition(this.rangeStart[0],this.rangeStart[1])
+  }
+}
 export class Obstacle extends MovableEntity {
   parent;
   isOnRoad;
@@ -2437,6 +2541,14 @@ export class Obstacle extends MovableEntity {
   isOther=false
   massMultiplier=1
   minSubgridDistance=3
+  pedestrians=[]
+  addPedestrian(){
+    let amount = Math.floor(Math.random()*2)+1
+    for(let i = 0;i<amount;i++){
+      let ped = new Pedestrian(this.game,this,this.subgridIndexes)
+      this.pedestrians.push(ped)
+    }
+  }
   set relativeDirection(value){
     this._relativeDirection=value
     this.laneWhenRelativeSet=this.chosenLane
@@ -2472,6 +2584,14 @@ export class Obstacle extends MovableEntity {
       let foundRoad=lastRoads[i]
       let lastDirection = directions[i]
       let foundGridIndexes = foundRoad.gridIndexes
+      //aynı yola aynı levhaya dair aynı yönden gelen ikinci levhayı koymuyoruz
+      if(foundRoad.obstacles.find(([obstacle,index])=>{
+        if(obstacle.entityType!=signName)return false
+        let usable = lastDirection
+        let abs = getAbsoluteSubgridIndex(index,this.parent._direction)
+        let directionList = getRelativeDirectionList([0,0],abs)
+        return directionList.includes(usable)
+      }))break
       signObstacle = new Obstacle(this.game, signName,null,this,lastDirection);
       if(signObstacle.setRoad(foundGridIndexes[0],foundGridIndexes[1])){
         signObstacle.setRelativePosition()
@@ -3103,6 +3223,13 @@ let getAbsoluteGlobalSubgrid = (road,subgridIndex)=>{
   let absIndex = getAbsoluteSubgridIndex(subgridIndex,road._direction)
   return [roadIndex[0]*3+absIndex[0]+2,roadIndex[1]*3+absIndex[1]+2]
 }
+let globalSubgridToCoordinates = globalSubgrid=>{
+  let base = [Math.floor(globalSubgrid[0]/3),Math.floor(globalSubgrid[1]/3)]
+  let remainder = [(globalSubgrid[0]%3)-1,(globalSubgrid[1]%3)-1]
+  let retVal = [base[0]*ROAD_WIDTH+remainder[0]*ROAD_WIDTH/3,base[1]*ROAD_WIDTH+remainder[1]*ROAD_WIDTH/3]
+  console.log("io",globalSubgrid,retVal)
+  return retVal
+}
 export class Game {
   roads;
   map;
@@ -3373,6 +3500,9 @@ export class Game {
       if(noRemainingRoads){
         obstacle.destroy()
         continue
+      }
+      if(obstacle.entityType=="yayaGecidi"){
+        obstacle.addPedestrian()
       }
       if (hasSign) {
         //subgrid kontrolü göreli olmayan yönlere göre yapılacak
