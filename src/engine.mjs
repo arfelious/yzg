@@ -6,7 +6,6 @@
           problemAmount kullanılacak, game içine kaydedilecek
     TODO:
           GENEL OPTİMİZASYON
-          yaya yön tutarsızlığı düzeltilecek
           levha sınırlama kontrol edilecek
           kural tabanlı otonomun şerit kontrolü iyileştirilmeli
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
@@ -1799,7 +1798,7 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,120,this.sensors.slice(0,5))
+    return this.checkSensor(this.isMain?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
   }
   checkBackThreat(){
       return this.checkSensor("car",100,this.sensors.slice(-2))
@@ -1844,7 +1843,7 @@ export class Car extends MovableEntity {
     let angleDifference = this.getGoalAngle()
     if(typeof angleDifference==="number")sum+=Math.sign(angleDifference)
     let frontSensors = sensors.slice(0,5)
-    let frontTriggered = frontSensors.filter(e=>e[1])
+    let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
     let threatCars = sensors.filter((e,i)=>i<4&&e[1]&&e[1].entityType=="car"&&e[1].absoluteVel()>10)
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
@@ -1872,7 +1871,7 @@ export class Car extends MovableEntity {
       if((now-this.stationaryAt>300||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         let weightedSumSign = Math.sign(weightedSum)
-        if(((now-this.stationaryAt>300)&&(backSensorsFree||freeBack!=-1))){
+        if(frontTriggered.length>0&&((now-this.stationaryAt>300)&&(backSensorsFree||freeBack!=-1))){
           this.entityMoveLimiter=1
           this.moveBackward(dt)
           let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
@@ -1880,8 +1879,12 @@ export class Car extends MovableEntity {
         }else if(frontPossible){
           this.entityMoveLimiter=0.3
           let canAct = !hasDynamicThreat
-          if(canAct)this.moveForward(dt,0.5)
-          this.steer(dt,weightedSumSign*2)
+          if(canAct)this.moveForward(dt)
+          if(canAct&&sumSign!=this.laneMultiplier){
+            this.switchLane()
+          }
+          this.steer(dt,weightedSumSign*1.5)
+        return true
         }
       }else{
         let minimum = frontTooClose?frontPossible?0.2:0:carIsComing?0.4:0.6
@@ -1889,13 +1892,12 @@ export class Car extends MovableEntity {
         let canAct = hasDominance||!hasDynamicThreat
         if(canAct&&frontPossible&&!frontTooClose)this.moveForward(dt)
         if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
-        this.steer(dt,sumSign*2)
+        this.steer(dt,sumSign*1.5)
         if(sumSign!=this.laneMultiplier){
           this.switchLane()
         }
       }
-      //önceki hız 0 değilse ama yeni hız sıfırsa
-      return this.isMain
+      return true
     }
     if(allNonPhysical)this.resetChanged()
     return true
@@ -1982,32 +1984,36 @@ export class Car extends MovableEntity {
     return true
   }
   checkPedCondition(){
-    return this.checkSensor(["yayaGecidi","yaya"],100)
+    return this.checkSensor(["yayaGecidi","pedestrian"],100)
   }
   _pedAction(dt){
     let res = this.checkPedCondition()
-    if(!res)return true
+    if(!res){
+      this.resetChanged()
+      return false
+    }
     let [dist,entity] = res
-    if(entity.entityType=="yaya"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
+    if(entity.entityType=="pedestrian"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
       this.customMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
       this.brake(dt)
-    }else{
-      this.customMoveLimiter=Math.max(0.5,this.entityMoveLimiter-this.absoluteVel()/100)
-    }
+    }else this.customMoveLimiter=0.8
     return true
   }
   checkPuddleCondition(){
-    return this.checkSensor(puddle,20)
+    return this.checkSensor("puddle",20,this.sensors.slice(0,5))
   }
   _puddleAction(dt){
     let res = this.checkPuddleCondition()
     if(!res)return true
-    this.customDragMultiplier=0.5
+    //sensörle varlığına bakıyoruz ama üzerindeyse sürtünmeyi düşürüyoruz
+    let isOnPuddle = this.lastColliders.find(e=>e.entityType=="puddle")
+    this.customDragMultiplier=isOnPuddle?0.5:1
+    this.customMoveLimiter=0.5
     return true
   }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
-      if(this.checkPedCondition){
+      if(this.checkPedCondition()){
         return this._pedAction
       }
       if(this.isMain&&this.checkLaneCondition()){
@@ -3108,7 +3114,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
   // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
   switch (roadCondition) {
     case "dirt":
-      acceleration = 80;
+      acceleration = 90;
       drag = 6;
       turnDrag = 1.2;
       alignment = 0.55;
