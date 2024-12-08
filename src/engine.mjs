@@ -1868,7 +1868,7 @@ export class Car extends MovableEntity {
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
       let backSensorsFree = back.every(e=>e[0]>25||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let freeBack = back.findIndex(e=>e[1]==null)
-      if((now-this.stationaryAt>300||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
+      if((frontTriggered.length>0&&(now-this.stationaryAt>300)||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         let weightedSumSign = Math.sign(weightedSum)
         if(frontTriggered.length>0&&((now-this.stationaryAt>300)&&(backSensorsFree||freeBack!=-1))){
@@ -1879,7 +1879,10 @@ export class Car extends MovableEntity {
         }else if(frontPossible){
           this.entityMoveLimiter=0.3
           let canAct = !hasDynamicThreat
-          if(canAct)this.moveForward(dt)
+          if(canAct){
+            if(this.absoluteVel>10)this.allowSteer=true
+            this.moveForward(dt)
+          }
           if(canAct&&sumSign!=this.laneMultiplier){
             this.switchLane()
           }
@@ -1887,7 +1890,7 @@ export class Car extends MovableEntity {
         return true
         }
       }else{
-        let minimum = frontTooClose?frontPossible?0.2:0:carIsComing?0.4:0.6
+        let minimum = frontTooClose?frontPossible?0.2:0:carIsComing?0.4:0.5
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
         let canAct = hasDominance||!hasDynamicThreat
         if(canAct&&frontPossible&&!frontTooClose)this.moveForward(dt)
@@ -1965,7 +1968,7 @@ export class Car extends MovableEntity {
     return true
   }
   checkSpeedCondition(){
-    return this.checkSign(["hiz","hizLevha","kasisLevha"])
+    return this.checkSign(["hiz","hizLevha","kasisLevha","yayaGecidi"])
   }
   _speedAction(dt){
     let res = this.checkSpeedCondition()
@@ -1973,7 +1976,7 @@ export class Car extends MovableEntity {
     let entity=res[0]
     let entityType = entity.entityType
     //hiz aslında hız sınırı levhası, hizLevha ise hız sınırının kaldırıldığını gösteriyor
-    if(entityType=="hiz"||entityType=="kasisLevha"){
+    if(entityType=="hiz"||entityType=="kasisLevha"||entityType=="yayaGecidi"){
       this.customMoveLimiter=0.8
 
     }else if(entityType=="hizLevha"){
@@ -3135,7 +3138,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       acceleration = 100;
       drag = 5.1;
       turnDrag = 1.1;
-      alignment = 0.9;
+      alignment = 0.8;
       steering = 1.4;
       turnLimiters = [3.1, 1.25];
   }
