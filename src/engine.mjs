@@ -2,12 +2,10 @@
     PRIORITY:
           model
           şerit takip düzeltme
+          tehdit algılama düzeltme
           collision resolution
-          problemAmount kullanılacak, game içine kaydedilecek
     TODO:
           GENEL OPTİMİZASYON
-          levha sınırlama kontrol edilecek
-          kural tabanlı otonomun şerit kontrolü iyileştirilmeli
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
       MAYBE:
         budama
@@ -75,7 +73,7 @@ let changeImageResolution = async (texture, options) => {
 const THREATS = ["rogar","bariyer","cukur","car","road","pedestrian"]
 const REAL_THREATS = ["rogar","bariyer","cukur","car","pedestrian"]
 
-const PHYSICAL_THREATS = ["car","pedestrian"]
+const PHYSICAL_THREATS = ["car","pedestrian","building"]
 const NONPHYSICAL_THREATS = ["yayaGecidi","light","kasis"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
 //total 1 olmaları gerekmiyor
@@ -208,6 +206,17 @@ const OBSTACLES = {
     roadCondition:"slippery",
     roadConditionInverted:false
   },
+  stopLevha: {
+    isOnRoad: false,
+    roadTypes: ["3","4"],
+    width: (CAR_WIDTH * 2) / 3,
+    image: "lvh.png",
+    useWidthAsHeight: false,
+    lanes: 1,
+    roadCondition:"slippery",
+    roadConditionInverted:false,
+    crossOnly:true
+  },
 };
 const OBSTACLE_SIGNS = [];
 const OBSTACLES_WITH_SIGN = Object.fromEntries(Object.keys(OBSTACLES).filter(e=>{
@@ -324,7 +333,7 @@ function getConnections(roadType, angle) {
 //her yol 9 kısma bölünebilir, bunlardan yol olmayanlara levha, olanlara engel yerleştirilebilir
 let getSubgridAngle = (index) => {
   //polar koordinat diye geçiyor aslında ama hem boyut bu durumda önemli değil hem de fonksiyon direkt kullanılırsa amacın anlaşılması zorlaşır
-  //atan2(x,y) şeklinde kullanılıyor ama bizde 0 derece kuzey olduğu için böyle yapıyoruz (doğu olmalı)
+  //asıl fonksiyon atan2(y,x) şeklinde kullanılıyor ama bizde 0 derece kuzey olduğu için atan(x,y) yapıyoruz (doğu olmalı)
   return toDegree(Math.atan2(index[0], index[1]));
 };
 let getSubgridIndex = (angle,magnitude=1) => {
@@ -1877,7 +1886,7 @@ export class Car extends MovableEntity {
           let currentSteeringMultiplier=backSensorsFree?-sumSign:freeBack==0?-2:2
           this.steer(dt,currentSteeringMultiplier*1.5,true)
         }else if(frontPossible){
-          this.entityMoveLimiter=0.3
+          this.entityMoveLimiter=0.7
           let canAct = !hasDynamicThreat
           if(canAct){
             if(this.absoluteVel>10)this.allowSteer=true
@@ -1977,7 +1986,7 @@ export class Car extends MovableEntity {
     let entityType = entity.entityType
     //hiz aslında hız sınırı levhası, hizLevha ise hız sınırının kaldırıldığını gösteriyor
     if(entityType=="hiz"||entityType=="kasisLevha"||entityType=="yayaGecidi"){
-      this.customMoveLimiter=0.8
+      this.customMoveLimiter=0.9
 
     }else if(entityType=="hizLevha"){
       this.customMoveLimiter=1
@@ -1987,7 +1996,7 @@ export class Car extends MovableEntity {
     return true
   }
   checkPedCondition(){
-    return this.checkSensor(["yayaGecidi","pedestrian"],100)
+    return this.checkSensor(["yayaGecidi","pedestrian"],80)
   }
   _pedAction(dt){
     let res = this.checkPedCondition()
@@ -2014,6 +2023,18 @@ export class Car extends MovableEntity {
     this.customMoveLimiter=0.5
     return true
   }
+  checkStopCondition(){
+    return this.checkSign("stop")
+  }
+  _stopAction(dt){
+    let res = this.checkStopCondition()
+    if(!res)return true
+    let vel = this.absoluteVel()
+    if(vel<1){
+      this.preventSign=res[0]
+    }else this.customMoveLimiter=0
+    return true
+  }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
       if(this.checkPedCondition()){
@@ -2033,6 +2054,9 @@ export class Car extends MovableEntity {
       }
       if(this.checkPuddleCondition()){
         return this._puddleAction
+      }
+      if(this.checkStopCondition()){
+        return this._stopAction
       }
     }
     return null;
@@ -2581,6 +2605,7 @@ export class Obstacle extends MovableEntity {
   massMultiplier=1
   minSubgridDistance=3
   pedestrians=[]
+  crossOnly=false
   addPedestrian(){
     let amount = Math.floor(Math.random()*2)+1
     for(let i = 0;i<amount;i++){
@@ -2692,6 +2717,9 @@ export class Obstacle extends MovableEntity {
     let sameParent = this.parentObstacle&&this.parentObstacle.parent==this.parent
     if(!this.isOnRoad){
       possibleSubgridIndexes=possibleSubgridIndexes.filter(e=>{
+        //|[-1,1]| vs. olduğunda sqrt2 olacak
+        let isCross = getMagnitude(e[0],e[1])==1
+        if(this.crossOnly&&!isCross)return false
         if(sameParent){
           return this.parentObstacle.subgridIndexes[0]==e[0]||this.parentObstacle.subgridIndexes[1]==e[1]
         }
@@ -2777,6 +2805,8 @@ export class Obstacle extends MovableEntity {
     this.height=curr.height||null
     this.usedLanes = curr.lanes??1;
     this.directionOffset = curr.directionOffset??0;
+    //boolean yapılıyor
+    this.crossOnly=!!curr.crossOnly
     if (!game.obstacleCounters[obstacleType]) {
       game.obstacleCounters[obstacleType] = 0;
     }
@@ -2974,6 +3004,8 @@ export class Building extends Filler {
     background.x = -ROAD_WIDTH / 2;
     background.y = -ROAD_WIDTH / 2;
     this.childContainer.addChild(background);
+    this.childContainer.zIndex=0
+    background.zIndex=0
     this.sprite.zIndex = 4;
   }
 }
@@ -3126,8 +3158,8 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       break;
     case "slippery":
       acceleration = 70;
-      drag = 3.6;
-      turnDrag = 1.26;
+      drag = 3.3;
+      turnDrag = 1.23;
       alignment = 0.6;
       steering = 1.4;
       turnLimiters = [3.7, 1.25];
@@ -3214,41 +3246,72 @@ let drawPath = (roads, currPath, clearPrevious = true) => {
   return retVal;
 };
 // https://gamedev.stackexchange.com/questions/160248/2d-rectangle-collision-resolution
-let resolveAllCollisions = (elements, elasticity = 1, maxIterations = 10, correctionFactor = 0.1,impulseCorrection=correctionFactor)=>{
-  //yön düzeltimi düzeltilmeli
+let resolveAllCollisions = (elements, elasticity = 1, maxIterations = 10, correctionFactor = 0.1, impulseCorrection = correctionFactor) => {
   let hasCollisions;
   let iteration = 0;
+
   do {
       hasCollisions = false;
-      for (const [elm1, colliders] of elements) {
-        for (const elm2 of colliders) {
-            if (!PHYSICAL_THREATS.includes(elm2.entityType)) continue;
-            let absBounds1 = getAbsoluteBounds(elm1);
-            let absBounds2 = getAbsoluteBounds(elm2);
-            if (!isOverlapping(absBounds1, absBounds2))continue
-            let overlap = getOverlap(absBounds1, absBounds2);
-            let correctionX = overlap.dx * correctionFactor;
-            let correctionY = overlap.dy * correctionFactor;
-            elm1.posX -= correctionX * (elm2.mass / (elm1.mass + elm2.mass));
-            elm1.posY -= correctionY * (elm2.mass / (elm1.mass + elm2.mass));
-            elm2.posX += correctionX * (elm1.mass / (elm1.mass + elm2.mass));
-            elm2.posY += correctionY * (elm1.mass / (elm1.mass + elm2.mass));
-            let relVelX = elm2.velX - elm1.velX;
-            let relVelY = elm2.velY - elm1.velY;
-            let relVelAlongNormal = relVelX * overlap.dx + relVelY * overlap.dy;
-            if (relVelAlongNormal > 0) continue;
-            let impulse =-(1 + elasticity) * relVelAlongNormal/(1 / elm1.mass + 1 / elm2.mass);
-            let impulseX = impulse * overlap.dx*impulseCorrection;
-            let impulseY = impulse * overlap.dy*impulseCorrection;
-            elm1.velX -= impulseX / elm1.mass;
-            elm1.velY -= impulseY / elm1.mass;
-            elm2.velX += impulseX / elm2.mass;
-            elm2.velY += impulseY / elm2.mass;
-        }
+
+      for (const [entity1, colliders] of elements) {
+          for (const entity2 of colliders) {
+              if (!PHYSICAL_THREATS.includes(entity2.entityType)) continue;
+              //yayalar birbirine çarpamıyor
+              if (entity1.entityType === "pedestrian" && entity2.entityType === entity1.entityType) continue;
+              let absBounds1 = getAbsoluteBounds(entity1);
+              let absBounds2 = getAbsoluteBounds(entity2);
+              if (!isOverlapping(absBounds1, absBounds2)) continue;
+              let overlap = getOverlap(absBounds1, absBounds2);
+              let immovableEntity = null;
+              let movableEntity = null;
+
+              if (entity1.isImmovable) {
+                  immovableEntity = entity1;
+                  movableEntity = entity2;
+              } else if (entity2.isImmovable) {
+                  immovableEntity = entity2;
+                  movableEntity = entity1;
+              }
+              if (immovableEntity) {
+                  let correctionX = overlap.dx * correctionFactor;
+                  let correctionY = overlap.dy * correctionFactor;
+                  movableEntity.posX += correctionX;
+                  movableEntity.posY += correctionY;
+                  let relVelX = movableEntity.velX;
+                  let relVelY = movableEntity.velY;
+                  let relVelAlongNormal = relVelX * overlap.dx + relVelY * overlap.dy;
+                  if (relVelAlongNormal > 0) continue;
+                  let impulse = -(1 + elasticity) * relVelAlongNormal / (1 / movableEntity.mass);
+                  let impulseX = impulse * overlap.dx * impulseCorrection;
+                  let impulseY = impulse * overlap.dy * impulseCorrection;
+                  movableEntity.velX += impulseX / movableEntity.mass;
+                  movableEntity.velY += impulseY / movableEntity.mass;
+              } else {
+                  let correctionX = overlap.dx * correctionFactor;
+                  let correctionY = overlap.dy * correctionFactor;
+                  entity1.posX -= correctionX * (entity2.mass / (entity1.mass + entity2.mass));
+                  entity1.posY -= correctionY * (entity2.mass / (entity1.mass + entity2.mass));
+                  entity2.posX += correctionX * (entity1.mass / (entity1.mass + entity2.mass));
+                  entity2.posY += correctionY * (entity1.mass / (entity1.mass + entity2.mass));
+                  let relVelX = entity2.velX - entity1.velX;
+                  let relVelY = entity2.velY - entity1.velY;
+                  let relVelAlongNormal = relVelX * overlap.dx + relVelY * overlap.dy;
+                  if (relVelAlongNormal > 0) continue;
+                  let impulse = -(1 + elasticity) * relVelAlongNormal / (1 / entity1.mass + 1 / entity2.mass);
+                  let impulseX = impulse * overlap.dx * impulseCorrection;
+                  let impulseY = impulse * overlap.dy * impulseCorrection;
+                  entity1.velX -= impulseX / entity1.mass;
+                  entity1.velY -= impulseY / entity1.mass;
+                  entity2.velX += impulseX / entity2.mass;
+                  entity2.velY += impulseY / entity2.mass;
+              }
+          }
       }
+
       iteration++;
   } while (hasCollisions && iteration < maxIterations);
-}
+};
+
 let getPathCost = (grid,path)=>{
   let cost = 0
   let costs = getCosts(grid)
@@ -3277,7 +3340,7 @@ export class Game {
   tickCounter = 0;
   wandererAmount = IS_PROD?4:10
   wanderers;
-  resolveCollision=false
+  resolveCollision=true
   lights=[]
   cars=[]
   gridEntitySets
@@ -3334,7 +3397,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(this.globalColliders,0.01,300,0.001,0.0001)
+      resolveAllCollisions(this.globalColliders,0.01,1000,0.0001,0.0001)
     }
     this.globalColliders = new Set();
     this.tickCounter++;
