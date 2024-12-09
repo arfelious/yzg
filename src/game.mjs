@@ -13,14 +13,14 @@ import {
 
 let game = new Game(app.stage);
 window.game=game
-game.setWanderers()
 let currentStart =
-  game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
+game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
 let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
 //aracı ortaya koyarak şeride girdiğini gösterebiliriz
 mainCar.setPosition(80, 75 + roadOffsetY);
+game.setWanderers()
 //--------------------------------------------------
 // WASD Butonları
 const controlButtons = {
