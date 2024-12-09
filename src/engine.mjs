@@ -1883,7 +1883,8 @@ export class Car extends MovableEntity {
     let angleDifference = this.getGoalAngle()
     let frontSensors = sensors.slice(0,5)
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
-    let threatCars = sensors.filter((e,i)=>i<5&&e[1]&&e[1].entityType=="car")
+    //ön yandaki sensörler 9 ve 10. indis
+    let threatCars = sensors.filter((e,i)=>(i<5||i==9||i==10)&&e[1]&&e[1].entityType=="car")
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
     let hasDynamicThreat = threatCars[0]||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
@@ -1910,9 +1911,12 @@ export class Car extends MovableEntity {
     if(absVelocity>20&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
-    let frontUsableness = frontPossibleness-frontCloseness*1.1+Math.max(0,(waitingFor-this.patienceFactor)/20)
-    this.isWaiting=threatCars.find(e=>e[0]<50&&e[1].isWaiting==1)
-    if(this.isWaiting)return 
+    let frontUsableness = frontPossibleness-frontCloseness*1.2+Math.max(0,(waitingFor-this.patienceFactor)/20)
+    this.isWaiting=threatCars.find(e=>e[0]<50&&e[1].isWaiting<3)?.isWaiting||0
+    if(this.isWaiting){
+      this.isWaiting++
+      return 
+    }
     if(mainTriggered||absVelocity<1||this.isGoingBackwards()){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
