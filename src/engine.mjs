@@ -47,7 +47,7 @@ await app.init({
   autoDensity: true,
 });
 const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-const IS_PROD = true
+const IS_PROD = false
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -1643,7 +1643,7 @@ export class Car extends MovableEntity {
   lastPath
   allowSteer=false
   isOverriden=false
-  isWaiting=false
+  isWaiting=0 //0 ise beklemiyor, 1 ise yaya/ışık bekliyor, 2 ise bekleyen birini bekliyor
   dominanceFactor=Math.random() //buna göre yol verecekler
   patienceFactor=Math.floor(Math.random()*3000+3000)//sabır faktörü, sorun olunca buna göre bekleyecekler
   preventGoal=false
@@ -1862,7 +1862,7 @@ export class Car extends MovableEntity {
   stationaryAt=0
   isOnRoad(){
     if(this.currentRoad==null)return false
-    let lines = [...this.currentRoad.getLines(),...this.currentRoad.getSurroundingLines()]
+    let lines = [...this.currentRoad.getLines()]
     return checkIsOnRoad(this,lines)
   }
   _threatAction(dt){
@@ -1874,9 +1874,7 @@ export class Car extends MovableEntity {
     let conditionSecond = sensors[2][1]&&(sensors[2][1].entityType=="road"?sensors[2][0]<40:sensors[2][0]<100&&REAL_THREATS.includes(sensors[2][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
-    //isWaiting test
-    //yoldan çıkınca geri girme
-    // öne yakın yan sensörler de domininanceFactors'te olmalı
+    //öne yakın yan sensörler de domininanceFactors'te olmalı
     //yolun ortasında yola dik kalanlara özel koşul
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
     //yavaşlamanın koşulları arttırılmalı
@@ -1889,7 +1887,7 @@ export class Car extends MovableEntity {
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
     let hasDynamicThreat = threatCars[0]||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
-    let [sum,weightedSum] = this.getSensorSums(hasDominance)
+    let [sum,weightedSum] = this.getSensorSums(hasDynamicThreat)
     let carIsComing = hasDynamicThreat
     let otherCar
     let directionAlignment = 0
@@ -1911,9 +1909,10 @@ export class Car extends MovableEntity {
     }).reduce((x,y)=>x+y)
     if(absVelocity>20&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
-    // 3 saniye bekledikten sonra yavaş yavaşagresiflik artıyor
-    let frontUsableness = frontPossibleness-frontCloseness*1.2+Math.max(0,(waitingFor-this.patienceFactor)/20)
-    this.isWaiting=threatCars.find(e=>e.isWaiting)
+    // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
+    let frontUsableness = frontPossibleness-frontCloseness*1.1+Math.max(0,(waitingFor-this.patienceFactor)/20)
+    this.isWaiting=threatCars.find(e=>e[0]<50&&e[1].isWaiting==1)
+    if(this.isWaiting)return 
     if(mainTriggered||absVelocity<1||this.isGoingBackwards()){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
@@ -1922,7 +1921,6 @@ export class Car extends MovableEntity {
       let freeBack = backFreenes.findIndex(e=>e)
       if((frontTriggered.length>0&&(now-this.stationaryAt>300)||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
-        let weightedSumSign = Math.sign(weightedSum)
         if(this.isWaiting)return
         if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
           if(IS_DEBUG)this.sprite.tint=0x00ff00
@@ -1933,7 +1931,7 @@ export class Car extends MovableEntity {
         }else if(frontUsableness>0){
           if(IS_DEBUG)this.sprite.tint=0x00ff99
           this.entityMoveLimiter=0.6
-          let canAct = (!hasDynamicThreat||hasDominance)&&!this.isWaiting
+          let canAct = (!hasDynamicThreat||hasDominance)
           if(canAct){
             this.moveForward(dt)
           }else this.brake(dt)
@@ -1947,7 +1945,7 @@ export class Car extends MovableEntity {
         if(IS_DEBUG)this.sprite.tint=0x999999
         let minimum = this.isWaiting?0:frontUsableness<-30?frontUsableness>10&&!bothTriggereed?0.2:0:carIsComing?0.5:0.6
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
-        let canAct = (hasDominance||!hasDynamicThreat)&&!this.isWaiting
+        let canAct = (hasDominance||!hasDynamicThreat)
         if(canAct){
           this.moveForward(dt)
         }
@@ -2000,7 +1998,7 @@ export class Car extends MovableEntity {
     if((light.state==LIGHT_STATES[0]&&dist<50)||(light.state==LIGHT_STATES[1]&&dist>=40)){
       this.entityMoveLimiter*=0.7
       this.brake(dt)
-      this.isWaiting=true
+      this.isWaiting=1
     }else this.isWaiting=false
     if(light.state==LIGHT_STATES[1]){
       this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter*0.9)
@@ -2056,10 +2054,10 @@ export class Car extends MovableEntity {
     if(entity.entityType=="pedestrian"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
       this.customMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
       this.brake(dt)
-      this.isWaiting=true
+      this.isWaiting=1
     }else{
       this.customMoveLimiter=0.8
-      this.isWaiting=false
+      this.isWaiting=0
     }
     return true
   }
@@ -2696,10 +2694,10 @@ export class Obstacle extends MovableEntity {
   set subgridIndexes(value){
     this._subgridIndexes=value
     let foundIndex = this.parent.obstacles.findIndex(e=>e[0]==this)
-    if(foundIndex!=-1)this.parent.obstacle[foundIndex][1]=value
+    if(foundIndex!=-1)this.parent.obstacles[foundIndex][1]=value
   }
-  //belirtilmezse 1-3 adet yaya ekleniyor
-  addPedestrian(amount=Math.ceil(Math.random()*2)+1,startingFromInitial){
+  //belirtilmezse 1-2 adet yaya ekleniyor
+  addPedestrian(amount=Math.floor(Math.random()*2)+1,startingFromInitial){
     for(let i = 0;i<amount;i++){
       let ped = new Pedestrian(this.game,this,this.subgridIndexes,startingFromInitial)
       this.pedestrians.push(ped)
@@ -2888,6 +2886,7 @@ export class Obstacle extends MovableEntity {
     let curr = OBSTACLES[obstacleType];
     this.entityType = obstacleType || "obstacle";
     if(THREATS.includes(obstacleType))this.massMultiplier=20
+    //OBSTACLES'ta olmayan nesneler de yolda sayılıyor
     this.isOnRoad = !curr || curr.isOnRoad;
     if (!this.isOnRoad) this.isCollisionEffected = false;
     if (!curr) return;
@@ -2926,6 +2925,7 @@ export class Light extends Obstacle {
   changeCounter=0;
   isReverse=false
   zIndex=3
+  minSubgridDistance=4
   sync(yellowLightTick,offset=0){
     if(!this.parent)return false
     this.yellowLightTick=yellowLightTick
@@ -3382,7 +3382,8 @@ let resolveCollision = (dt,entity1,entity2,maxIterations,elasticity,correctionFa
   let iteration = 0;
   while(iteration < maxIterations) {
     if(!PHYSICAL_THREATS.includes(entity2.entityType) || !PHYSICAL_THREATS.includes(entity1.entityType)) break;
-    if(entity1.entityType === "pedestrian" && entity2.entityType === entity1.entityType) break;
+    //yayalar yalnızca araçlarla etkileşime geçebilir
+    if(entity1.entityType == "pedestrian"?entity2.entityType!="car":entity2.entityType=="pedestrian"?entity1.entityType!="car":false) break;
     let absBounds1 = getAbsoluteBounds(entity1);
     let absBounds2 = getAbsoluteBounds(entity2);
     if(!isOverlapping(absBounds1, absBounds2)) break;
@@ -3486,7 +3487,7 @@ let getPathCost = (grid,path)=>{
 let getAbsoluteGlobalSubgrid = (road,subgridIndex)=>{
   let roadIndex = road.gridIndexes
   let absIndex = getAbsoluteSubgridIndex(subgridIndex,road._direction)
-  return [roadIndex[0]*3+absIndex[0]+2,roadIndex[1]*3+absIndex[1]+2]
+  return [roadIndex[0]*3+absIndex[0]+1,roadIndex[1]*3+absIndex[1]+1]
 }
 export class Game {
   roads;
