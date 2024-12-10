@@ -6,8 +6,14 @@
           collision resolution
     TODO:
           GENEL OPTİMİZASYON
+          hız levhası
+          kesilen hedef çizgisi
+          sabit nesne collision
+          normal collision
+          stop levhası
+          ivme sınır
+          ışık sınır
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
-          avare doğum noktaları
       MAYBE:
         budama
         model basıyor olsa da basılan butonlar WASD kısmında gösterilmeli
@@ -122,7 +128,8 @@ const OBSTACLES = {
     useWidthAsHeight: true,
     lanes: 1,
     roadCondition:"dirt",
-    roadConditionInverted:true
+    roadConditionInverted:true,
+    isImmovable:true,
   },
   bariyerLevha: {
     isOnRoad: false,
@@ -1784,7 +1791,7 @@ export class Car extends MovableEntity {
     this.entityMoveLimiter=1
     this.laneMultiplier=1
     this.customDragMultiplier=1
-    this.isWaiting=false
+    this.isWaiting=0
     this.sprite.tint=0xffffff
   }
   getAction() {
@@ -1842,6 +1849,15 @@ export class Car extends MovableEntity {
       return directionList.includes(right)
     })
   }
+  checkBackThreatCondition(){
+    return this.checkSensor(PHYSICAL_THREATS,50,this.sensors.slice(-2))
+  }
+  _backThreatAction(dt){
+    let res = this.checkBackThreatCondition()
+    if(!res)return true
+    this.moveForward(dt,0.5)
+    return true
+  }
   checkThreatCondition(){
     return this.checkSensor(this.isMain||!this.isOnRoad()?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
   }
@@ -1879,7 +1895,7 @@ export class Car extends MovableEntity {
     //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
     //yavaşlamanın koşulları arttırılmalı
     let isOnRoad = this.isOnRoad()
-    let threatsToUse = isOnRoad?THREATS:REAL_THREATS
+    let threatsToUse = isOnRoad?REAL_THREATS:THREATS
     let angleDifference = this.getGoalAngle()
     let frontSensors = sensors.slice(0,5)
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
@@ -1902,7 +1918,7 @@ export class Car extends MovableEntity {
     let allNonPhysical = sensors.every(e=>!e[1]||!threatsToUse.includes(e[1].entityType))
     let frontCloseness = ~~frontSensors.map(e=>{
       let isProblematic = e[1]&&threatsToUse.includes(e[1].entityType)
-      return !isProblematic?0:Math.max(5,50-e[0])
+      return !isProblematic?0:Math.max(10,50-e[0])
     }).reduce((x,y)=>x+y,0)
     let frontPossibleness = ~~frontSensors.map(e=>{
       let isPossible = e[0]>40&&(!e[1]||!threatsToUse.includes(e[1].entityType))
@@ -1911,8 +1927,11 @@ export class Car extends MovableEntity {
     if(absVelocity>20&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
-    let frontUsableness = frontPossibleness-frontCloseness*1.2+Math.max(0,(waitingFor-this.patienceFactor)/20)
-    this.isWaiting=threatCars.find(e=>e[0]<50&&e[1].isWaiting<3)?.isWaiting||0
+    let frontUsability = frontPossibleness-frontCloseness*1.3+Math.max(0,(waitingFor-this.patienceFactor)/20)
+    //bekleme değeri normalde 0, ışık ve yaya geçidinde 1
+    //ışıkta veya yaya geçidindeki aracı görenlerin ise 2+
+    //2+ olanların isWaiting'te kalması için kendilerinden düşük ancak 0 olmayan isWaiting değerine sahip araç bulmalılar
+    this.isWaiting=threatCars.find(e=>e[0]<60&&e[1].isWaiting!=0&&e[1].isWaiting<4&&(this.isWaiting==0||e[1].isWaiting<this.isWaiting))?.[1].isWaiting||0
     if(this.isWaiting){
       this.isWaiting++
       return 
@@ -1926,13 +1945,13 @@ export class Car extends MovableEntity {
       if((frontTriggered.length>0&&(now-this.stationaryAt>300)||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         if(this.isWaiting)return
-        if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
+        //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
           if(IS_DEBUG)this.sprite.tint=0x00ff00
           this.entityMoveLimiter=1
-          if(!this.isWaiting)this.moveBackward(dt)
+          this.moveBackward(dt)
           let currentSteeringMultiplier=backSensorsFree?-sumSign*1.5:freeBack==0?-2:2
           this.steer(dt,currentSteeringMultiplier,true)
-        }else if(frontUsableness>0){
+        /*else if(frontUsability>0){
           if(IS_DEBUG)this.sprite.tint=0x00ff99
           this.entityMoveLimiter=0.6
           let canAct = (!hasDynamicThreat||hasDominance)
@@ -1943,11 +1962,11 @@ export class Car extends MovableEntity {
             this.switchLane()
           }
           this.steer(dt,weightedSum*1.5)
+        }*/
         return
-        }
       }else{
         if(IS_DEBUG)this.sprite.tint=0x999999
-        let minimum = this.isWaiting?0:frontUsableness<-30?frontUsableness>10&&!bothTriggereed?0.2:0:carIsComing?0.5:0.6
+        let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.2:0:carIsComing?0.5:0.6
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
         let canAct = (hasDominance||!hasDynamicThreat)
         if(canAct){
@@ -1972,6 +1991,9 @@ export class Car extends MovableEntity {
     if(chosenAlgorithm=="rule"){
       if(this.checkThreatCondition()){
         return this._threatAction
+      }
+      if(this.checkBackThreatCondition()){
+        return this._backThreatAction
       }
     }else{
 
@@ -2003,7 +2025,7 @@ export class Car extends MovableEntity {
       this.entityMoveLimiter*=0.7
       this.brake(dt)
       this.isWaiting=1
-    }else this.isWaiting=false
+    }else this.isWaiting=0
     if(light.state==LIGHT_STATES[1]){
       this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter*0.9)
       this.allowSteer=true
@@ -2073,7 +2095,7 @@ export class Car extends MovableEntity {
     if(!res)return true
     //sensörle varlığına bakıyoruz ama üzerindeyse sürtünmeyi düşürüyoruz
     let isOnPuddle = this.lastColliders.find(e=>e.entityType=="puddle")
-    this.customDragMultiplier=isOnPuddle?0.5:1
+    this.customDragMultiplier=isOnPuddle?0.7:1
     this.entityMoveLimiter=0.5
     return true
   }
@@ -2334,7 +2356,7 @@ export class Car extends MovableEntity {
 }
 export class MainCar extends Car {
   isMain = true;
-  dominanceFactor=0.5
+  dominanceFactor=0
   constructor(game, spritePath) {
     super(game, spritePath, true);
   }
@@ -2564,8 +2586,13 @@ export class Pedestrian extends MovableEntity{
   startingFromInitial
   tryDirectionCounter=0
   lastAngleMultiplier=1
+  passingStartedAt=0
   getAlignment(){
     return 1
+  }
+  replenish(){
+    this.parent.addPedestrian(1,this.startingFromInitial!=(this.counter%2==1))
+    this.destroy()
   }
   tick(dt){
     if(this.destroyed)return
@@ -2582,8 +2609,7 @@ export class Pedestrian extends MovableEntity{
           //%50 ihtimalle ölüyor, ölmezse dönüp yeniden geçiyor
           //yeni gelecek olanı aynı yere koyuyoruz 
           //(başladığı yerde değil) XOR (başlangıç noktasından başlar)
-          this.parent.addPedestrian(1,this.startingFromInitial!=(this.counter%2==1))
-          this.destroy()
+          this.replenish()
         }
       }
     }
@@ -2591,6 +2617,7 @@ export class Pedestrian extends MovableEntity{
       //her frame düşük şansı olunca bir süre durup geçmeye başlamış oluyor
       if(Math.random()*1000<1){
         this.state="passing"
+        this.passingStartedAt=this.tickCounter
       }
     }
     if(this.state=="passing"){
@@ -2619,8 +2646,13 @@ export class Pedestrian extends MovableEntity{
         if(this.tryDirectionCounter>0){
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
-          this.velX+=nonDirectionalSpeed*pedDirection[0]*2
-          this.velY+=nonDirectionalSpeed*pedDirection[1]*2
+          let passedTickCount = this.tickCounter-this.passingStartedAt
+          this.velX+=nonDirectionalSpeed*pedDirection[0]*2+Math.min(100,passedTickCount)
+          this.velY+=nonDirectionalSpeed*pedDirection[1]*2+Math.min(100,passedTickCount)
+          if(passedTickCount>1500){
+            //karşıdan karşıya geçmesi bu kadar sürmemeli
+            this.isCollisionEffected=false
+          }
         }
         if(remainingRatio<0.03){
           this.state="turning"
@@ -2631,6 +2663,7 @@ export class Pedestrian extends MovableEntity{
           this.velY=0
           this.accX=0
           this.accY=0
+          this.isCollisionEffected=true
         }
       }
     }
@@ -2900,6 +2933,7 @@ export class Obstacle extends MovableEntity {
     this.height=curr.height||null
     this.usedLanes = curr.lanes??1;
     this.directionOffset = curr.directionOffset??0;
+    if(curr.isImmovable)this.isImmovable=true
     //boolean yapılıyor
     this.crossOnly=!!curr.crossOnly
     if (!game.obstacleCounters[obstacleType]) {
@@ -3423,6 +3457,7 @@ let resolveAxis = (axisIndex, overlapAmount, entity1, entity2, dt, elasticity, c
   let relativeVelocity = isX ? entity2.velX - entity1.velX : entity2.velY - entity1.velY;
   let relVelAlongNormal = relativeVelocity * normalizedNormal;
   let movableEntity, immovableEntity;
+  if(!entity1.isCollisionEffected||!entity2.isCollisionEffected)return false
   if (entity1.isImmovable && !entity2.isImmovable) {
     immovableEntity = entity1;
     movableEntity = entity2;
@@ -3858,7 +3893,7 @@ export class Game {
     }
     this.entities.forEach(e=>e.destroy());
   }
-  constructor(stage,gameTick, obstacleAmounts = {}, onlySpecified = false, maxObstacles = IS_PROD?12:20, minObstacles = IS_PROD?10:12) {
+  constructor(stage,gameTick, obstacleAmounts = {}, onlySpecified = false, maxObstacles = IS_PROD?12:30, minObstacles = IS_PROD?7:20) {
     this.gameTick=gameTick
     this.minObstacles = minObstacles;
     this.maxObstacles = maxObstacles;
