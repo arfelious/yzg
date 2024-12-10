@@ -1910,16 +1910,16 @@ export class Car extends MovableEntity {
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
     let hasDynamicThreat = threatCars.length>0||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
     let [sum,weightedSum] = this.getSensorSums(hasDynamicThreat)
-    let leftIsFullyDynamic = [sensors[5],sensors[7],sensors[9]].every(e=>e[1]&&e[1].entityType=="car"&&e[0]<50)
-    let rightIsFullyDynamic = [sensors[6],sensors[8],sensors[10]].every(e=>e[1]&&e[1].entityType=="car"&&e[0]<50)
+    let leftIsFullyDynamic = [sensors[5],sensors[7],sensors[9]].filter(e=>e[1]&&e[1].entityType=="car"&&e[0]<50).length>=2
+    let rightIsFullyDynamic = [sensors[6],sensors[8],sensors[10]].filter(e=>e[1]&&e[1].entityType=="car"&&e[0]<50).length>=2
     //sol ya da sağ sensörlerde full araç varsa o yöne gidememeli
     //ikisinde de varsa burada karışılmıyor
     //xor
-    //if(leftIsFullyDynamic!=rightIsFullyDynamic){
-    //  if(leftIsFullyDynamic){
-    //    sum=Math.max(sum,0)
-    //  }else sum=Math.min(sum,0)
-    //}
+    if(leftIsFullyDynamic!=rightIsFullyDynamic){
+      if(leftIsFullyDynamic){
+        sum=Math.max(sum,Number.EPSILON)
+      }else sum=Math.min(sum,-Number.EPSILON)
+    }
     let carIsComing = threatCars.length>0
     let otherCar
     let directionAlignment = 0
@@ -2530,7 +2530,6 @@ export class Road extends Entity {
     this.highlightLines[index].moveTo(startX, startY).lineTo(endX, endY).stroke();
   }
   toggleHighlight(index, value = !this.highlightToggles[index]) {
-    if (Array.isArray(index)) index.forEach(e=>this.toggleHighlight(e, value));
     if (!this.highlightContainer) {
       this.highlightContainer = new PIXI.Container();
       app.stage.addChild(this.highlightContainer);
@@ -2546,7 +2545,9 @@ export class Road extends Entity {
       this.drawHighlight(index);
     }
     this.highlightToggles[index] = value;
-    this.highlightLines[index].visible = value;
+    if(value!=this.highlightLines[index].visible){
+      this.highlightLines[index].visible = value;
+    }
   }
   destroy() {
     super.destroy();
@@ -2840,7 +2841,7 @@ export class Obstacle extends MovableEntity {
     //bu şekilde nesne döndürülünce eski değer ve yeni değerin bilinmesi gerekmeyecek
     let possibleSubgridIndexes = getPossibleSubgrids(currRoad.roadType, 0, this.isOnRoad)
     if(this.isOnRoad)possibleSubgridIndexes=possibleSubgridIndexes.filter(e=>{
-      if(this.parent.roadType=="4"&&(e[0]==0||e[1]==0))return false
+      if((this.parent.roadType=="4"||this.parent.roadType=="3")&&(e[0]==0||e[1]==0))return false
       //ardışık engel sınırlamasına uymayacak subgrid'leri siliyoruz
       let currentGlobalSubgrid = getAbsoluteGlobalSubgrid(this.parent,e)
       return !this.game.roads.find(e=>e.find(otherRoad=>{
