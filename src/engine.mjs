@@ -1875,7 +1875,7 @@ export class Car extends MovableEntity {
     let lines = [...this.currentRoad.getLines()]
     return checkIsOnRoad(this,lines)
   }
-  _threatAction(dt){
+  #threatAction(dt){
     if(!this.checkThreatCondition())return true
     let now = Date.now()
     let sensors = this.sensors.slice(0,11).map(e=>e.output)
@@ -1992,10 +1992,10 @@ export class Car extends MovableEntity {
   getThreatAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
       if(this.checkPedThreatCondition()){
-        return this._pedAction
+        return this.#pedAction
       }
       if(this.checkThreatCondition()){
-        return this._threatAction
+        return this.#threatAction
       }
     }else{
 
@@ -2010,13 +2010,13 @@ export class Car extends MovableEntity {
     if(res&&res[1].state!=LIGHT_STATES[2])return res
     return false
   }
-  _laneAction(dt){
+  #laneAction(dt){
     let res = this.checkLaneCondition()
     if(!res)return true
     this.steer(dt,Math.max(-2,-CAR_WIDTH/res[0]/10))
     return true
   }
-  _lightAction(dt){
+  #lightAction(dt){
     let res = this.checkLightCondition()
     if(!res){
       this.entityMoveLimiter=1
@@ -2037,7 +2037,7 @@ export class Car extends MovableEntity {
   checkBumpCondition(){
     return this.checkSensor("kasis",40)
   }
-  _bumpAction(dt){
+  #bumpAction(dt){
     let res = this.checkBumpCondition()
     if(!res){
       if(this.entityMoveLimiter>0.8){
@@ -2052,7 +2052,7 @@ export class Car extends MovableEntity {
   checkSpeedCondition(){
     return this.checkSign(["hiz","hizLevha","kasisLevha","yayaGecidi"])
   }
-  _speedAction(dt){
+  #speedAction(dt){
     let res = this.checkSpeedCondition()
     if(!res)return true
     let entity=res[0]
@@ -2075,7 +2075,7 @@ export class Car extends MovableEntity {
   checkPedRuleCondition(){
     return this.checkSensor("yayaGecidi",80)
   }
-  _pedAction(dt){
+  #pedAction(dt){
     let res = this.checkSensor(["yayaGecidi","pedestrian"],80)
     if(!res){
       this.resetChanged()
@@ -2095,7 +2095,7 @@ export class Car extends MovableEntity {
   checkPuddleCondition(){
     return this.checkSensor("puddle",20,this.sensors.slice(0,5))
   }
-  _puddleAction(dt){
+  #puddleAction(dt){
     let res = this.checkPuddleCondition()
     if(!res)return true
     //sensörle varlığına bakıyoruz ama yalnızca birikintinin üzerindeyse sürtünmeyi düşürüyoruz
@@ -2107,7 +2107,7 @@ export class Car extends MovableEntity {
   checkStopCondition(){
     return this.checkSign("stopLevha")
   }
-  _stopAction(dt){
+  #stopAction(dt){
     let res = this.checkStopCondition()
     if(!res)return true
     let vel = this.absoluteVel()
@@ -2124,25 +2124,25 @@ export class Car extends MovableEntity {
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
       if(this.checkPedRuleCondition()){
-        return this._pedAction
+        return this.#pedAction
       }
       if(this.isMain&&this.checkLaneCondition()){
-        return this._laneAction
+        return this.#laneAction
       }
       if(this.checkLightCondition()){
-        return this._lightAction
+        return this.#lightAction
       }
       if(this.checkBumpCondition()){
-        return this._bumpAction
+        return this.#bumpAction
       }
       if(this.checkSpeedCondition()){
-        return this._speedAction
+        return this.#speedAction
       }
       if(this.checkPuddleCondition()){
-        return this._puddleAction
+        return this.#puddleAction
       }
       if(this.checkStopCondition()){
-        return this._stopAction
+        return this.#stopAction
       }
     }
     return null;
@@ -2150,7 +2150,7 @@ export class Car extends MovableEntity {
   getGoalAction(chosenAlgorithm) {
     if(this.preventGoal)return null
     if (this.isWandering||this.path && this.path.length > 0) {
-      return this._getGoalAction;
+      return this.#goalAction;
     }
     return null;
   }
@@ -2200,7 +2200,7 @@ export class Car extends MovableEntity {
     let angleDifference = getNormalizedAngle(angleToTarget-this._direction);
     return angleDifference
   }
-  _getGoalAction(dt) {
+  #goalAction(dt) {
     let angleResult = this.getGoalAngle()
     if(typeof angleResult==="boolean")return angleResult
     let angleDifference = angleResult
