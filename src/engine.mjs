@@ -1849,15 +1849,6 @@ export class Car extends MovableEntity {
       return directionList.includes(right)
     })
   }
-  checkBackThreatCondition(){
-    return this.checkSensor(PHYSICAL_THREATS,50,this.sensors.slice(-2))
-  }
-  _backThreatAction(dt){
-    let res = this.checkBackThreatCondition()
-    if(!res)return true
-    this.moveForward(dt,0.5)
-    return true
-  }
   checkThreatCondition(){
     return this.checkSensor(this.isMain||!this.isOnRoad()?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
   }
@@ -1991,9 +1982,6 @@ export class Car extends MovableEntity {
     if(chosenAlgorithm=="rule"){
       if(this.checkThreatCondition()){
         return this._threatAction
-      }
-      if(this.checkBackThreatCondition()){
-        return this._backThreatAction
       }
     }else{
 
