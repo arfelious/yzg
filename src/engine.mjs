@@ -217,7 +217,7 @@ const OBSTACLES = {
     image: "lvh.png",
     useWidthAsHeight: false,
     lanes: 1,
-    roadCondition:"none", //gerçekte olmasa da inverted zaten
+    roadCondition:"slippery",
     roadConditionInverted:true,
     crossOnly:true
   },
@@ -925,16 +925,6 @@ export let findPath = (grid, pathAlgorithm, road1Indexes, road2Indexes, getMinim
       return res;
     }
   }
-};
-let findPathTo = function(x, y, getMinimumDistance, forceInitialDirection) {
-  let gridIndexes = getIndexes(x, y);
-  let [gridX, gridY] = gridIndexes;
-  let gridElement = this.game.map[gridX][gridY];
-  let currIndexes = getIndexes(this.posX, this.posY);
-  if (!gridElement || gridElement[0] == -1) return false;
-  if (gridX == currIndexes[0] && gridY == currIndexes[1]) return false;
-  let res = findPath(this.game.map, this.pathAlgorithm, currIndexes, gridIndexes, getMinimumDistance, forceInitialDirection);
-  return res;
 };
 let imagePaths = {};
 //Tüm resimler asenkron yükleniyor, hepsi yüklenene kadar bekleniliyor
@@ -1707,7 +1697,7 @@ export class Car extends MovableEntity {
     let nextDirection = currRoadType == "straight"?currentDirection: 
       getNextDirection(currRoadType, currRoad.direction, fromDirection, null, currentDirection)
     let forcedDirection = DIRECTION_ALTERNATIVE == 1 ? nextDirection : fromDirection;
-    let currPath = findPathTo.call(this, x, y, true, forcedDirection);
+    let currPath = this.findPathTo(x, y, true, forcedDirection);
     if (currPath) {
       this.setPath(currPath);
     } else {
@@ -1724,6 +1714,16 @@ export class Car extends MovableEntity {
     let BC = this.getLines()[1];
     return [(BC[0][0] + BC[1][0]) / 2, (BC[0][1] + BC[1][1]) / 2];
   }
+  findPathTo(x, y, getMinimumDistance, forceInitialDirection) {
+    let gridIndexes = getIndexes(x, y);
+    let [gridX, gridY] = gridIndexes;
+    let gridElement = this.game.map[gridX][gridY];
+    let currIndexes = getIndexes(this.posX, this.posY);
+    if (!gridElement || gridElement[0] == -1) return false;
+    if (gridX == currIndexes[0] && gridY == currIndexes[1]) return false;
+    let res = findPath(this.game.map, this.pathAlgorithm, currIndexes, gridIndexes, getMinimumDistance, forceInitialDirection);
+    return res;
+  };
   setPath(path, isWrongDirection = false) {
     this.path = path;
     this.isWrongDirection = isWrongDirection;
@@ -1859,8 +1859,11 @@ export class Car extends MovableEntity {
       let entity = e[0]
       if(entity.isOnRoad)return false
       if(this.preventSigns.includes(entity)||(!entityTypes.includes(entity.entityType)&&!hasAny))return false
-      let directionList = getRelativeDirectionList([this.posX,this.posY],[entity.posX,entity.posY])
-      return directionList.includes(right)
+      let currentPos = [this.posX,this.posY]
+      let entityPos = [entity.posX,entity.posY]
+      let directionList = getRelativeDirectionList(currentPos,entityPos)
+      let dist = getMagnitude(currentPos[0]-entityPos[0],currentPos[1]-entityPos[1])
+      return directionList.includes(right)&&dist<ROAD_WIDTH/3
     })
   }
   checkThreatCondition(){
@@ -1899,7 +1902,7 @@ export class Car extends MovableEntity {
     let isOnRoad = this.isOnRoad()
     let threatsToUse = isOnRoad?REAL_THREATS:THREATS
     let angleDifference = this.getGoalAngle()
-    let frontSensors = sensors.slice(0,5)
+    let frontSensors = sensors.slice(0,5).concat([sensors[9],sensors[10]])
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
     //ön yandaki sensörler 9 ve 10. indis
     let threatCars = sensors.filter((e,i)=>e[1]&&e[1].entityType=="car")
@@ -1946,35 +1949,22 @@ export class Car extends MovableEntity {
     this.isWaiting=threatCars.find(e=>e[0]<60&&e[1].isWaiting!=0&&e[1].isWaiting<4&&(this.isWaiting==0||e[1].isWaiting<this.isWaiting))?.[1].isWaiting||0
     if(this.isWaiting){
       this.isWaiting++
-      return 
+      return this.isMain
     }
     if(mainTriggered||absVelocity<1||this.isGoingBackwards()){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-      let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!threatsToUse.includes(e[1].entityType)))
+      let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let backSensorsFree = backFreenes.every(e=>e)
       let freeBack = backFreenes.findIndex(e=>e)
       if((backSensorsFree||freeBack!=-1)&&((frontUsability<-15||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0||absVelocity<4)){
-        //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
-        if(this.isWaiting)return
+        //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
         //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
           if(IS_DEBUG)this.sprite.tint=0x00ff00
           this.entityMoveLimiter=1
           this.moveBackward(dt)
           let currentSteeringMultiplier=backSensorsFree?-sumSign*1.5:freeBack==0?-2:2
           this.steer(dt,currentSteeringMultiplier,true)
-        /*else if(frontUsability>0){
-          if(IS_DEBUG)this.sprite.tint=0x00ff99
-          this.entityMoveLimiter=0.6
-          let canAct = (!hasDynamicThreat||hasDominance)
-          if(canAct){
-            this.moveForward(dt)
-          }else this.brake(dt)
-          if(canAct&&sumSign!=this.laneMultiplier){
-            this.switchLane()
-          }
-          this.steer(dt,weightedSum*1.5)
-        }*/
         return
       }else{
         if(IS_DEBUG)this.sprite.tint=0x999999
@@ -1989,8 +1979,8 @@ export class Car extends MovableEntity {
           this.switchLane()
         }
       }
-      this.steer(dt,sumSign)
-      return
+      this.steer(dt,sumSign*1.25)
+      return this.isMain
     }else{
       if(IS_DEBUG)this.sprite.tint=0xffffff
       this.entityMoveLimiter=1
@@ -2019,12 +2009,6 @@ export class Car extends MovableEntity {
     let res = this.checkSensor("light",80)
     if(res&&res[1].state!=LIGHT_STATES[2])return res
     return false
-  }
-  #laneAction(dt){
-    let res = this.checkLaneCondition()
-    if(!res)return true
-    this.steer(dt,Math.max(-2,-CAR_WIDTH/res[0]/10))
-    return true
   }
   #lightAction(dt){
     let res = this.checkLightCondition()
@@ -2070,9 +2054,9 @@ export class Car extends MovableEntity {
     //hiz aslında hız sınırı levhası, hizLevha ise hız sınırının kaldırıldığını gösteriyor
     if(entityType=="hiz"){
       //bu sınırlayıcı kendisi sıfırlanmıyor
-      this.customMoveLimiter=0.85
+      this.customMoveLimiter=0.83
     }else if(entityType=="kasisLevha"||entityType=="yayaGecidi"){
-      this.entityMoveLimiter=0.85
+      this.entityMoveLimiter=0.83
     }else if(entityType=="hizLevha"){
       this.customMoveLimiter=1
     }
@@ -2126,7 +2110,7 @@ export class Car extends MovableEntity {
       this.isWaiting=0
       return true
     }else{
-      this.entityMoveLimiter=0.1
+      this.entityMoveLimiter=0
       this.brake(dt)
       this.isWaiting=1
     }
@@ -2136,9 +2120,9 @@ export class Car extends MovableEntity {
       if(this.checkPedRuleCondition()){
         return this.#pedAction
       }
-      if(this.isMain&&this.checkLaneCondition()){
-        return this.#laneAction
-      }
+      //if(this.isMain&&this.checkLaneCondition()){
+      //  return this.#laneAction
+      //}
       if(this.checkLightCondition()){
         return this.#lightAction
       }
@@ -2550,17 +2534,15 @@ export class Road extends Entity {
     if (!this.highlightContainer) {
       this.highlightContainer = new PIXI.Container();
       app.stage.addChild(this.highlightContainer);
-      this.highlightContainer.zIndex=4
     }
+    let curr = this.highlightLines[index];
+    if (curr&&curr.destroyed) return;
     if (!this.highlightLines[index]) {
       this.highlightLines[index] = new PIXI.Graphics();
-    }
-    if (value) {
-      let curr = this.highlightLines[index];
-      if (curr.destroyed) return;
+      curr=this.highlightLines[index]
+      this.highlightContainer.addChild(curr);
       curr.setStrokeStyle(highlightStyle);
       curr.zIndex = this.zIndex + 1;
-      this.highlightContainer.addChild(curr);
       this.drawHighlight(index);
     }
     this.highlightToggles[index] = value;
@@ -2858,6 +2840,7 @@ export class Obstacle extends MovableEntity {
     //bu şekilde nesne döndürülünce eski değer ve yeni değerin bilinmesi gerekmeyecek
     let possibleSubgridIndexes = getPossibleSubgrids(currRoad.roadType, 0, this.isOnRoad)
     if(this.isOnRoad)possibleSubgridIndexes=possibleSubgridIndexes.filter(e=>{
+      if(this.parent.roadType=="4"&&(e[0]==0||e[1]==0))return false
       //ardışık engel sınırlamasına uymayacak subgrid'leri siliyoruz
       let currentGlobalSubgrid = getAbsoluteGlobalSubgrid(this.parent,e)
       return !this.game.roads.find(e=>e.find(otherRoad=>{
@@ -3398,7 +3381,7 @@ let clearPath = (roads) => {
 };
 let drawPath = (roads, currPath, clearPrevious = true) => {
   if (!currPath) return;
-  if (currPath.length < 2) return;
+  if (currPath.length < PATH_START_INDEX) return;
   if (clearPrevious) {
     clearPath(roads);
   }
@@ -3406,7 +3389,7 @@ let drawPath = (roads, currPath, clearPrevious = true) => {
   let lastRoadIndex = currPath[1];
   let lastRoad = roads[lastRoadIndex[0]][lastRoadIndex[1]];
   let lastConnections = getConnections(lastRoad.roadType, lastRoad._direction);
-  if (currPath.length == 2) {
+  if (currPath.length == PATH_START_INDEX) {
     let firstRoadIndex = currPath[0];
     let currentRelation = getRelativeDirection(firstRoadIndex, lastRoadIndex);
     return lastConnections.indexOf(currentRelation);
@@ -3421,7 +3404,7 @@ let drawPath = (roads, currPath, clearPrevious = true) => {
     let indexLast = lastConnections.indexOf(highlightInPrevious);
     let indexCurr = currentConnections.indexOf(currentRelation);
     if (i == PATH_START_INDEX) {
-      retVal = length == 2 ? indexCurr : indexLast;
+      retVal = length == PATH_START_INDEX ? indexCurr : indexLast;
     }
     lastRoad.toggleHighlight(indexLast, true);
     currRoad.toggleHighlight(indexCurr, true);
