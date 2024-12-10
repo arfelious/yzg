@@ -964,9 +964,13 @@ let dotProduct = (x, y) => {
   for (let i = 0; i < x.length; i++) product += x[i] * y[i];
   return product;
 };
+//stackoverflow.com/a/3461533
+//PQ PR için
 let crossProduct = (P, Q, R) => {
   return (Q[0] - P[0]) * (R[1] - P[1]) - (Q[1] - P[1]) * (R[0] - P[0]);
 };
+//3 noktanın birbirine göre yönü bulunurken 1 ve 2. noktaları oluşturan vektör ile 1. ve 3. noktaları oluşturan vektörün çapraz çarpımı yapılıyor
+// 0 ise paralel, 1 ise birbirine göre saat yönündee, 2 ise saat yönünün tersinde
 let getOrientation = (P, Q, R) => {
   const val = crossProduct(P, Q, R);
   if (val == 0) return 0;
@@ -996,7 +1000,8 @@ let getLaneCoordinates = (direction, coords, laneMultiplier, roadDivider = 8) =>
   let targetY = coords[1] * ROAD_WIDTH + ROAD_WIDTH / 2 + yOffset;
   return [targetX, targetY];
 };
-//bunun türetilişine bakılacak
+// Cramer kuralı
+// stackoverflow.com/a/14795484
 let getIntersectionPoint = (line1, line2) => {
   let [A, B] = line1;
   let [C, D] = line2;
@@ -2635,8 +2640,9 @@ export class Pedestrian extends MovableEntity{
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
           let passedTickCount = this.tickCounter-this.passingStartedAt
-          this.velX+=nonDirectionalSpeed*pedDirection[0]*2+Math.min(100,passedTickCount)
-          this.velY+=nonDirectionalSpeed*pedDirection[1]*2+Math.min(100,passedTickCount)
+          nonDirectionalSpeed+=Math.min(100,passedTickCount/10)
+          this.velX+=nonDirectionalSpeed*pedDirection[0]*2
+          this.velY+=nonDirectionalSpeed*pedDirection[1]*2
           if(passedTickCount>1500){
             //karşıdan karşıya geçmesi bu kadar sürmemeli
             this.isCollisionEffected=false
@@ -3438,7 +3444,7 @@ let resolveAllCollisions = (dt, entities, maxIterations = 10, elasticity = 1, co
   }
 };
 // araçların tek eksende çarpması durumunda diğer eksende hareket edebilmeleri için eksenlerin ayrı halledilmesi gerekiyor
-// https://gamedev.stackexchange.com/a/160253
+// gamedev.stackexchange.com/a/160253
 let resolveAxis = (axisIndex, overlapAmount, entity1, entity2, dt, elasticity, correctionFactor, impulseCorrection) => {
   let isX = axisIndex ==0;
   let normalizedNormal =overlapAmount //isX ? Math.sign(overlapAmount) : Math.sign(overlapAmount);
@@ -3472,7 +3478,7 @@ let resolveAxis = (axisIndex, overlapAmount, entity1, entity2, dt, elasticity, c
   } else {
     if(overlapAmount<10)return false
     if (relVelAlongNormal >= 0) return false;
-    //https://gamedev.stackexchange.com/a/5915
+    // gamedev.stackexchange.com/a/5915
     //nokta çarpımı 0'dan büyükse birbirine doğru yönlendirmek gerekiyormuş
     //biz de böyle yapıyoruz ama genelleştirmeden dolayı, birbirine yönlenmelerini engellemek için >0 ise düzeltim yapılmıyor
     let posDifference = [entity1.posX-entity2.posX,entity1.posY-entity2.posY]
