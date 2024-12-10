@@ -1538,7 +1538,14 @@ export class MovableEntity extends Entity {
   entitySteeringMultiplier = STEERING_MULTIPLIER;
   entityMinAlignment = MIN_ALIGNMENT;
   entityTurnLimiters = [2, 1.25];
-  customMoveLimiter=1 //0-1.0 arası olmak zorunda, hız sınırlamalarında kullanılacak
+  _customMoveLimiter=1
+  get customMoveLimiter(){
+    return this._customMoveLimiter
+  }
+  set customMoveLimiter(value){ //0-1.0 arası olmak zorunda, hız sınırlamalarında kullanılıyor
+    if(value<0||value>1)return
+    return this._customMoveLimiter=value
+  }
   customDragMultiplier=1
   _entityMoveLimiter=1
   get entityDrag(){
@@ -1792,14 +1799,14 @@ export class Car extends MovableEntity {
     }
   }
   lastActionType=null
-  preventSign;
+  preventSigns=[];
   resetChanged(){
     this.entityMoveLimiter=1
     this.laneMultiplier=1
     this.customDragMultiplier=1
     this.isWaiting=0
     this.sprite.tint=0xffffff
-    this.preventSign=null
+    this.preventSigns=[]
   }
   getAction() {
     if(!this.isOverriden){
@@ -1847,12 +1854,12 @@ export class Car extends MovableEntity {
     let facingDirection = this.getFacingDirection()
     //haritaya göre değil, araca göre sağ
     let right = connectionArray[(connectionLookup[facingDirection]+1)%4]
+    let hasAny = entityTypes.includes("any")
     return this.currentRoad&&this.currentRoad.obstacles.find(e=>{
       let entity = e[0]
       if(entity.isOnRoad)return false
-      if(entity==this.preventSign||!entityTypes.includes(entity.entityType)&&!entityTypes.includes("any"))return false
-      let absoluteSubgrid = getAbsoluteSubgridIndex(entity.subgridIndexes,entity.parent._direction)
-      let directionList = getRelativeDirectionList([0,0],absoluteSubgrid)
+      if(this.preventSigns.includes(entity)||(!entityTypes.includes(entity.entityType)&&!hasAny))return false
+      let directionList = getRelativeDirectionList([this.posX,this.posY],[entity.posX,entity.posY])
       return directionList.includes(right)
     })
   }
@@ -2069,7 +2076,7 @@ export class Car extends MovableEntity {
     }else if(entityType=="hizLevha"){
       this.customMoveLimiter=1
     }
-
+    this.preventSigns.push(entity)
     return true
   }
   checkPedThreatCondition(){
@@ -2115,7 +2122,7 @@ export class Car extends MovableEntity {
     if(!res)return true
     let vel = this.absoluteVel()
     if(vel<10){
-      this.preventSign=res[0]
+      this.preventSigns.push(res[0])
       this.isWaiting=0
       return true
     }else{
