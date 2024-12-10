@@ -325,8 +325,12 @@ let getWeightedRandom = (obj) => {
   }
   return last;
 };
-let checkIsOnRoad = (entity,roadLines)=>{
+let checkIsOnRoad = (entity,road)=>{
     let entityLines = entity.getLines()
+    let absBounds = getAbsoluteBounds(road)
+    let [minX,maxX,minY,maxY] = getMinsAndMaxes(absBounds)
+    if(entity.posX<minX||entity.posX>maxX||entity.posY<minY||entity.posY>maxY)return false
+    let roadLines = road.getLines()
     let [A,B,C,D] = entityLines
     let aStart = A
     let dStart = D
@@ -1872,8 +1876,7 @@ export class Car extends MovableEntity {
   stationaryAt=0
   isOnRoad(){
     if(this.currentRoad==null)return false
-    let lines = [...this.currentRoad.getLines()]
-    return checkIsOnRoad(this,lines)
+    return checkIsOnRoad(this,this.currentRoad)
   }
   #threatAction(dt){
     if(!this.checkThreatCondition())return true
@@ -3111,7 +3114,7 @@ export class Building extends Filler {
     let leftSpace = (ROAD_WIDTH * ratio) / 2;
     let spriteX = x + offsetX;
     let spriteY = y + offsetY;
-    this.collisionEntity.setPosition(spriteX,spriteY)
+    //this.collisionEntity.setPosition(spriteX,spriteY)
     this.sprite.x = spriteX;
     this.sprite.y = spriteY;
     this.childContainer.x = x;
@@ -3182,7 +3185,7 @@ export class Building extends Filler {
     this.childContainer.zIndex=0
     background.zIndex=0
     this.sprite.zIndex = 4;
-    this.collisionEntity=new BuildingCollision(game)
+    //this.collisionEntity=new BuildingCollision(game)
   }
 }
 export class Park extends Filler {
