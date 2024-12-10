@@ -10,8 +10,9 @@ import {
   arrayEquals,
   getIndexes,
 } from "../src/engine.mjs";
-
-let game = new Game(app.stage);
+const FIXED_LOOP_MS = 7;
+const FIXED_LOOP_S = FIXED_LOOP_MS / 1000;
+let game = new Game(app.stage,FIXED_LOOP_S);
 window.game=game
 let currentStart =
 game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
@@ -74,8 +75,6 @@ window.addEventListener("keyup", (event) => {
 });
 let frameText = "0";
 let lastUpdate = Date.now();
-const FIXED_LOOP_MS = 7;
-const FIXED_LOOP_S = FIXED_LOOP_MS / 1000;
 let accumulatedTime = 0;
 const dropdowns = document.querySelectorAll(".model select");
 dropdowns.forEach((dropdown, index) => {

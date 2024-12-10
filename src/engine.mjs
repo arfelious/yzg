@@ -2077,7 +2077,7 @@ export class Car extends MovableEntity {
     }
     let [dist,entity] = res
     if(entity.entityType=="pedestrian"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
-      this.entityMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
+      this.entityMoveLimiter/=2
       this.brake(dt)
       this.isWaiting=1
     }else{
