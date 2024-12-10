@@ -1991,6 +1991,9 @@ export class Car extends MovableEntity {
   }
   getThreatAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
+      if(this.checkPedThreatCondition()){
+        return this._pedAction
+      }
       if(this.checkThreatCondition()){
         return this._threatAction
       }
@@ -2066,11 +2069,14 @@ export class Car extends MovableEntity {
 
     return true
   }
-  checkPedCondition(){
-    return this.checkSensor(["yayaGecidi","pedestrian"],80)
+  checkPedThreatCondition(){
+    return this.checkSensor("pedestrian",80)
+  }
+  checkPedRuleCondition(){
+    return this.checkSensor("yayaGecidi",80)
   }
   _pedAction(dt){
-    let res = this.checkPedCondition()
+    let res = this.checkSensor(["yayaGecidi","pedestrian"],80)
     if(!res){
       this.resetChanged()
       return false
@@ -2117,7 +2123,7 @@ export class Car extends MovableEntity {
   }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
-      if(this.checkPedCondition()){
+      if(this.checkPedRuleCondition()){
         return this._pedAction
       }
       if(this.isMain&&this.checkLaneCondition()){
