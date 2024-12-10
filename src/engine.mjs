@@ -1902,9 +1902,9 @@ export class Car extends MovableEntity {
     let isOnRoad = this.isOnRoad()
     let threatsToUse = isOnRoad?REAL_THREATS:THREATS
     let angleDifference = this.getGoalAngle()
+    //ön yandaki sensörler 9 ve 10. indis
     let frontSensors = sensors.slice(0,5).concat([sensors[9],sensors[10]])
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
-    //ön yandaki sensörler 9 ve 10. indis
     let threatCars = sensors.filter((e,i)=>e[1]&&e[1].entityType=="car")
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
@@ -1931,14 +1931,14 @@ export class Car extends MovableEntity {
     }
     let absVelocity = this.absoluteVel()
     let allNonPhysical = sensors.every(e=>!e[1]||!threatsToUse.includes(e[1].entityType))
-    let frontCloseness = ~~frontSensors.map(e=>{
+    let frontCloseness = Math.floor(frontSensors.map(e=>{
       let isProblematic = e[1]&&threatsToUse.includes(e[1].entityType)
       return !isProblematic?0:Math.max(10,50-e[0])
-    }).reduce((x,y)=>x+y,0)
-    let frontPossibleness = ~~frontSensors.map(e=>{
+    }).reduce((x,y)=>x+y,0))
+    let frontPossibleness = Math.floor(frontSensors.map(e=>{
       let isPossible = e[0]>40&&(!e[1]||!threatsToUse.includes(e[1].entityType))
       return isPossible?Math.max(5,e[0]-40):0
-    }).reduce((x,y)=>x+y)
+    }).reduce((x,y)=>x+y))
     if(absVelocity>16&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
@@ -2064,13 +2064,13 @@ export class Car extends MovableEntity {
     return true
   }
   checkPedThreatCondition(){
-    return this.checkSensor("pedestrian",80)
+    return this.checkSensor("pedestrian",100)
   }
   checkPedRuleCondition(){
-    return this.checkSensor("yayaGecidi",80)
+    return this.checkSensor("yayaGecidi",100)
   }
   #pedAction(dt){
-    let res = this.checkSensor(["yayaGecidi","pedestrian"],80)
+    let res = this.checkSensor(["yayaGecidi","pedestrian"],100)
     if(!res){
       this.resetChanged()
       return false
@@ -2178,14 +2178,14 @@ export class Car extends MovableEntity {
     let isNowTurning = facingDirection!=goalDirection
     const THRESHOLD = ROAD_WIDTH/4
     let hasPassedStart =!isTurning||(!relativeToCurr.find(e=>Math.abs(e/THRESHOLD)>3))
-    let roadDistanceMultiplier = isTurning?1:1
+    let roadDistanceMultiplier = isTurning?1:1.04
     if(relativeTurningDirection=="left")roadDistanceMultiplier-=0.2
     let hasCompletedCurrentRoad = distanceToNext<ROAD_WIDTH*roadDistanceMultiplier
     let midGoal = [(this.path[0][0]*0.8+this.path[1][0]*0.2),(this.path[0][1]*0.8+this.path[1][1]*0.2)]
     let useCurrent = isTurning&&!hasCompletedCurrentRoad
     let currGoal = useCurrent?midGoal:this.path[1]
     let currentMultiplier = this.laneMultiplier
-    let currentDivider = useCurrent?10:8
+    let currentDivider = relativeTurningDirection=="right"||useCurrent?10:8
     let directionToUse = (isTurning&&!hasCompletedCurrentRoad)?lastDirection:relativeDirection
     let [targetX, targetY] = getLaneCoordinates(directionToUse, currGoal, currentMultiplier, currentDivider);
     let dx = targetX - this.posX;
@@ -2649,7 +2649,7 @@ export class Pedestrian extends MovableEntity{
         if(effectiveSpeed<0.2){ // yola göre yaya hızı değişmiyor, normal konum değişimleri 0.23-0.24 gibi
           if(this.tryDirectionCounter<3){
             //+= ile fazla birikebiliyor
-            this.tryDirectionCounter=10
+            this.tryDirectionCounter=30
           }
           //rastgele yön denenmesi ama üst üste aynısının kullanılması için
           this.lastAngleMultiplier=Math.round(Math.random())?1:-1
@@ -2658,7 +2658,7 @@ export class Pedestrian extends MovableEntity{
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
           let passedTickCount = this.tickCounter-this.passingStartedAt
-          nonDirectionalSpeed+=Math.min(50,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
+          nonDirectionalSpeed+=Math.min(30,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
           this.velX+=nonDirectionalSpeed*pedDirection[0]*2
           this.velY+=nonDirectionalSpeed*pedDirection[1]*2
           if(passedTickCount>1000){
@@ -3619,7 +3619,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(dt,this.globalColliders,20,1,1)
+      resolveAllCollisions(dt,this.globalColliders,30,1,1)
     }
     this.globalColliders = new Set();
     this.tickCounter++;
