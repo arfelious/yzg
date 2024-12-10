@@ -6,12 +6,8 @@
           collision resolution
     TODO:
           GENEL OPTİMİZASYON
-          hız levhası
-          kesilen hedef çizgisi
           sabit nesne collision
           normal collision
-          stop levhası
-          ivme sınır
           ışık sınır
           resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
       MAYBE:
@@ -221,8 +217,8 @@ const OBSTACLES = {
     image: "lvh.png",
     useWidthAsHeight: false,
     lanes: 1,
-    roadCondition:"slippery",
-    roadConditionInverted:false,
+    roadCondition:"none", //gerçekte olmasa da inverted zaten
+    roadConditionInverted:true,
     crossOnly:true
   },
 };
@@ -1760,7 +1756,8 @@ export class Car extends MovableEntity {
       if(foundIndex!=-1||this.isWandering){
         this.lastPath=this.path[foundIndex-1]??this.lastPath
       }
-      this.setPath(this.path.slice(foundIndex));
+      let currPath = foundIndex==-1?this.path:this.path.slice(foundIndex)
+      this.setPath(currPath);
     }
     if(this.isWandering){
         if(!this.currentRoad){
@@ -1798,6 +1795,7 @@ export class Car extends MovableEntity {
     this.customDragMultiplier=1
     this.isWaiting=0
     this.sprite.tint=0xffffff
+    this.preventSign=null
   }
   getAction() {
     if(!this.isOverriden){
@@ -1848,7 +1846,7 @@ export class Car extends MovableEntity {
     return this.currentRoad&&this.currentRoad.obstacles.find(e=>{
       let entity = e[0]
       if(entity.isOnRoad)return false
-      if(entity==this.preventSign||!entityTypes.includes(entity.entityType))return false
+      if(entity==this.preventSign||!entityTypes.includes(entity.entityType)&&!entityTypes.includes("any"))return false
       let absoluteSubgrid = getAbsoluteSubgridIndex(entity.subgridIndexes,entity.parent._direction)
       let directionList = getRelativeDirectionList([0,0],absoluteSubgrid)
       return directionList.includes(right)
@@ -1886,9 +1884,7 @@ export class Car extends MovableEntity {
     let conditionSecond = sensors[2][1]&&(sensors[2][1].entityType=="road"?sensors[2][0]<40:sensors[2][0]<100&&REAL_THREATS.includes(sensors[2][1].entityType))
     let mainTriggered = conditionFirst||conditionSecond
     let bothTriggereed = conditionFirst&&conditionSecond
-    //öne yakın yan sensörler de domininanceFactors'te olmalı
-    //yolun ortasında yola dik kalanlara özel koşul
-    //nesne karşı şeritteyse öncelik kendi şeridine geçmekte olmalı
+    //sağ veya sol sensörlerin tamamını araçlar kaplıyorsa o yöne gidilmemeli
     //yavaşlamanın koşulları arttırılmalı
     let isOnRoad = this.isOnRoad()
     let threatsToUse = isOnRoad?REAL_THREATS:THREATS
@@ -1896,16 +1892,26 @@ export class Car extends MovableEntity {
     let frontSensors = sensors.slice(0,5)
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
     //ön yandaki sensörler 9 ve 10. indis
-    let threatCars = sensors.filter((e,i)=>(i<5||i==9||i==10)&&e[1]&&e[1].entityType=="car")
+    let threatCars = sensors.filter((e,i)=>e[1]&&e[1].entityType=="car")
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
-    let hasDynamicThreat = threatCars[0]||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
+    let hasDynamicThreat = threatCars.length>0||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
     let [sum,weightedSum] = this.getSensorSums(hasDynamicThreat)
-    let carIsComing = hasDynamicThreat
+    let leftIsFullyDynamic = [sensors[5],sensors[7],sensors[9]].every(e=>e[1]&&e[1].entityType=="car"&&e[0]<50)
+    let rightIsFullyDynamic = [sensors[6],sensors[8],sensors[10]].every(e=>e[1]&&e[1].entityType=="car"&&e[0]<50)
+    //sol ya da sağ sensörlerde full araç varsa o yöne gidememeli
+    //ikisinde de varsa burada karışılmıyor
+    //xor
+    //if(leftIsFullyDynamic!=rightIsFullyDynamic){
+    //  if(leftIsFullyDynamic){
+    //    sum=Math.max(sum,0)
+    //  }else sum=Math.min(sum,0)
+    //}
+    let carIsComing = threatCars.length>0
     let otherCar
     let directionAlignment = 0
     if(carIsComing){
-      otherCar = hasDynamicThreat[0]
+      otherCar = threatCars[0]
       let speedAlignment = dotProduct(toUnitVector([this.velX,this.velY]),toUnitVector([otherCar.velX,otherCar.velY]))
       carIsComing=speedAlignment<-0.3
       directionAlignment = dotProduct(toVector(this.direction),toUnitVector([otherCar.velX,otherCar.velY]))
@@ -1920,7 +1926,7 @@ export class Car extends MovableEntity {
       let isPossible = e[0]>40&&(!e[1]||!threatsToUse.includes(e[1].entityType))
       return isPossible?Math.max(5,e[0]-40):0
     }).reduce((x,y)=>x+y)
-    if(absVelocity>20&&!this.isGoingBackwards())this.stationaryAt=now
+    if(absVelocity>16&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
     let frontUsability = frontPossibleness-frontCloseness*1.3+Math.max(0,(waitingFor-this.patienceFactor)/20)
@@ -1935,10 +1941,10 @@ export class Car extends MovableEntity {
     if(mainTriggered||absVelocity<1||this.isGoingBackwards()){
       let sumSign = Math.sign(sum)
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
-      let backFreenes = back.map(e=>e[0]>25||e[1]==null||(!threatsToUse.includes(e[1].entityType)))
+      let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let backSensorsFree = backFreenes.every(e=>e)
       let freeBack = backFreenes.findIndex(e=>e)
-      if((frontTriggered.length>0&&(now-this.stationaryAt>300)||frontTriggered.length>=3)&&(this.getAlignment()<=0||absVelocity<2)){
+      if((backSensorsFree||freeBack!=-1)&&((frontUsability<-15||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0||absVelocity<2)){
         //araç kendine doğru gelmiyorsa en erken 0.3 saniye sonra geri gidebiliyor
         if(this.isWaiting)return
         //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
@@ -2038,7 +2044,6 @@ export class Car extends MovableEntity {
       this.entityMoveLimiter=(1+this.entityMoveLimiter)/2
     }
     this.entityMoveLimiter=Math.max(0.3,this.entityMoveLimiter-this.absoluteVel()/100)
-    this.customMoveLimiter=1
     return true
   }
   checkSpeedCondition(){
@@ -2050,14 +2055,15 @@ export class Car extends MovableEntity {
     let entity=res[0]
     let entityType = entity.entityType
     //hiz aslında hız sınırı levhası, hizLevha ise hız sınırının kaldırıldığını gösteriyor
-    if(entityType=="hiz"||entityType=="kasisLevha"||entityType=="yayaGecidi"){
-      this.customMoveLimiter=0.9
-
+    if(entityType=="hiz"){
+      //bu sınırlayıcı kendisi sıfırlanmıyor
+      this.customMoveLimiter=0.85
+    }else if(entityType=="kasisLevha"||entityType=="yayaGecidi"){
+      this.entityMoveLimiter=0.85
     }else if(entityType=="hizLevha"){
       this.customMoveLimiter=1
-
     }
-    this.preventSign=entity
+
     return true
   }
   checkPedCondition(){
@@ -2071,11 +2077,11 @@ export class Car extends MovableEntity {
     }
     let [dist,entity] = res
     if(entity.entityType=="pedestrian"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
-      this.customMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
+      this.entityMoveLimiter=Math.max(0,this.entityMoveLimiter-this.absoluteVel()/100)
       this.brake(dt)
       this.isWaiting=1
     }else{
-      this.customMoveLimiter=0.8
+      this.entityMoveLimiter=1
       this.isWaiting=0
     }
     return true
@@ -2086,23 +2092,28 @@ export class Car extends MovableEntity {
   _puddleAction(dt){
     let res = this.checkPuddleCondition()
     if(!res)return true
-    //sensörle varlığına bakıyoruz ama üzerindeyse sürtünmeyi düşürüyoruz
+    //sensörle varlığına bakıyoruz ama yalnızca birikintinin üzerindeyse sürtünmeyi düşürüyoruz
     let isOnPuddle = this.lastColliders.find(e=>e.entityType=="puddle")
     this.customDragMultiplier=isOnPuddle?0.7:1
     this.entityMoveLimiter=0.5
     return true
   }
   checkStopCondition(){
-    return this.checkSign("stop")
+    return this.checkSign("stopLevha")
   }
   _stopAction(dt){
     let res = this.checkStopCondition()
     if(!res)return true
     let vel = this.absoluteVel()
-    if(vel<1){
+    if(vel<10){
       this.preventSign=res[0]
-    }else this.customMoveLimiter=0
-    return true
+      this.isWaiting=0
+      return true
+    }else{
+      this.entityMoveLimiter=0.1
+      this.brake(dt)
+      this.isWaiting=1
+    }
   }
   getRuleAction(chosenAlgorithm) {
     if(chosenAlgorithm=="rule"){
@@ -2196,9 +2207,6 @@ export class Car extends MovableEntity {
       this.steer(dt,steeringMultiplier)
     }
     this.moveForward(dt);
-  }
-  resetPrevented(){
-    this.preventSign=null
   }
   setVehicleProperties() {
     let currentProperties = calculateVehicleProperties(this.currentRoad?.roadCondition || "asphalt", this.isTurning, this.isUsingBrake);
@@ -2325,7 +2333,6 @@ export class Car extends MovableEntity {
     this.setVehicleProperties();
     this.onIndexChange.push(this.setRoad);
     this.onIndexChange.push(this.resetPath);
-    this.onIndexChange.push(this.resetPrevented);
     this.onIndexChange.push(this.setVehicleProperties);
     this.childGraphics.push(this.customLine);
     this.width = CAR_WIDTH;
@@ -2349,7 +2356,7 @@ export class Car extends MovableEntity {
 }
 export class MainCar extends Car {
   isMain = true;
-  dominanceFactor=0
+  dominanceFactor=0.5
   constructor(game, spritePath) {
     super(game, spritePath, true);
   }
@@ -2608,6 +2615,18 @@ export class Pedestrian extends MovableEntity{
     }
     if(this.state=="waiting"){
       //her frame düşük şansı olunca bir süre durup geçmeye başlamış oluyor
+      let currentPlace = this.counter%2==1?this.rangeEnd:this.rangeStart
+      let distanceVector = [currentPlace[0]-this.posX,currentPlace[1]-this.posY]
+      let remaining = getMagnitude(distanceVector[0],distanceVector[1])
+      let remainingRatio = remaining/this.parent.width
+      //güncel konumdan bir sebeple uzaklaşıldıysa bir oranda geri dönecek
+      if(remainingRatio>0.03){
+        let speed = 100
+        let directionVector = toUnitVector(distanceVector)
+        let nonDirectionalSpeed = speed*dt*PEDESTRIAN_MOVE_MULTIPLIER
+        this.velX=directionVector[0]*nonDirectionalSpeed
+        this.velY=directionVector[1]*nonDirectionalSpeed
+      }
       if(Math.random()*1000<1){
         this.state="passing"
         this.passingStartedAt=this.tickCounter
@@ -2622,7 +2641,7 @@ export class Pedestrian extends MovableEntity{
       let directionVector = toUnitVector(distanceVector)
       let gridIndexes = getIndexes(this.posX,this.posY)
       let carsInGrid = Array.from(this.game.gridEntitySets[gridIndexes[0]]?.[gridIndexes[1]]||[]).filter(e=>e.entityType=="car")
-      if(!carsInGrid.find(e=>e.absoluteVel()>3)){
+      if(!this.isCollisionEffected||!carsInGrid.find(e=>e.absoluteVel()>3)){
         let nonDirectionalSpeed = speed*dt*PEDESTRIAN_MOVE_MULTIPLIER
         this.velX=directionVector[0]*nonDirectionalSpeed
         this.velY=directionVector[1]*nonDirectionalSpeed
@@ -2640,10 +2659,10 @@ export class Pedestrian extends MovableEntity{
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
           let passedTickCount = this.tickCounter-this.passingStartedAt
-          nonDirectionalSpeed+=Math.min(100,passedTickCount/10)
+          nonDirectionalSpeed+=Math.min(50,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
           this.velX+=nonDirectionalSpeed*pedDirection[0]*2
           this.velY+=nonDirectionalSpeed*pedDirection[1]*2
-          if(passedTickCount>1500){
+          if(passedTickCount>1000){
             //karşıdan karşıya geçmesi bu kadar sürmemeli
             this.isCollisionEffected=false
           }
@@ -3823,7 +3842,7 @@ export class Game {
     }
     if (obstacleAmount < this.maxObstacles) {
       let remaining = this.maxObstacles - obstacleAmount;
-      let chosenAmount = remaining
+      let chosenAmount = Math.floor(Math.random()*(remaining-1))+1
       let remainingRoads = shuffle(this.possibleRoads.filter(e=>{
         let road = this.roads[e[0]][e[1]]
         return road.roadCondition=="asphalt"&&road.obstacles.length == 0
