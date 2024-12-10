@@ -2653,7 +2653,7 @@ export class Pedestrian extends MovableEntity{
             this.tryDirectionCounter=10
           }
           //rastgele yön denenmesi ama üst üste aynısının kullanılması için
-          this.lastAngleMultiplier=Math.round(Math.round())?1:-1
+          this.lastAngleMultiplier=Math.round(Math.random())?1:-1
         }
         if(this.tryDirectionCounter>0){
           this.tryDirectionCounter--
