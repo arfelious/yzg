@@ -2000,8 +2000,9 @@ export class Car extends MovableEntity {
         //xor
       }else if(frontImpossibility<100!=hasDynamicThreat&&!mainBlockedByCar){
         let [sum,weightedSum] = this.getSensorSums(true)
-        this.sumCounters[this.sumCounter++%5]=sum
-        let lastSums = this.sumCounters.reduce((x,y)=>x+Math.sign(y)/*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/)
+        this.sumCounters[this.sumCounter++%5]=[sum,now]
+        let lastSums = this.sumCounters.filter(e=>now-e[1]<100).map(e=>e[0]).reduce((x,y)=>x+Math.sign(y)) /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
+        if(typeof angleDifference=="number")lastSums+=Math.sign(angleDifference)
         let sumSign = Math.abs(lastSums)<3?0:Math.sign(lastSums)
         if(IS_DEBUG)this.sprite.tint=0x999999
         let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.5:0:0.5
@@ -2016,9 +2017,9 @@ export class Car extends MovableEntity {
         this.steer(dt,sumSign*1.25)
         return this.isMain
       }else{
-        this.entityMoveLimiter=0.5
+        this.entityMoveLimiter=0.7
         if(frontImpossibility>30||hasDynamicThreat)this.brake(dt)
-        if(frontImpossibility<=30&&!mainBlockedByCar){
+        if(frontImpossibility<=50&&!mainBlockedByCar){
           let [sum] = this.getSensorSums(false)
           this.steer(dt,Math.sign(sum)*1.25)
         }
@@ -2193,7 +2194,7 @@ export class Car extends MovableEntity {
     return null;
   }
   getGoalAngle(){
-    if (!this.path || this.path.length<2){
+    if (!this.path || this.path.length<2||!this.goal){
       if(this.isWandering){
         this.goal=null
         this.resetPath()
@@ -2408,7 +2409,7 @@ export class Car extends MovableEntity {
 }
 export class MainCar extends Car {
   isMain = true;
-  dominanceFactor=0.2
+  dominanceFactor=0.5
   constructor(game, spritePath) {
     super(game, spritePath, true);
   }
@@ -2784,7 +2785,7 @@ export class Obstacle extends MovableEntity {
   laneWhenRelativeSet
   isOther=false
   massMultiplier=1
-  minSubgridDistance=3
+  minSubgridDistance=4
   pedestrians=[]
   crossOnly=false
   _subgridIndexes
