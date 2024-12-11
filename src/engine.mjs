@@ -3863,7 +3863,7 @@ export class Game {
     }
     if (obstacleAmount < this.maxObstacles) {
       let remaining = this.maxObstacles - obstacleAmount;
-      let chosenAmount = Math.max(remaining,2) //normalde kalan engel miktarı kadar, aksi takdirde 2 adet ışık
+      let chosenAmount = Math.max(remaining,2)+Math.floor(Math.random()*2)//normalde kalan engel miktarı kadar, aksi takdirde 2+ adet ışık
       let remainingRoads = shuffle(this.possibleRoads.filter(e=>{
         let road = this.roads[e[0]][e[1]]
         return road.roadCondition!="dirt"&&road.obstacles.length == 0
