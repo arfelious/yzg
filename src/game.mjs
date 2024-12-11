@@ -19,8 +19,7 @@ game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
 let mainCar = new MainCar(game, "temp_car");
 window.mainCar = mainCar;
-//aracı ortaya koyarak şeride girdiğini gösterebiliriz
-mainCar.setPosition(80, 75 + roadOffsetY);
+mainCar.setPosition(80, 100 + roadOffsetY);
 game.setWanderers()
 //--------------------------------------------------
 // WASD Butonları

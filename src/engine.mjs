@@ -1701,12 +1701,12 @@ export class Car extends MovableEntity {
     if (currPath) {
       this.setPath(currPath);
     } else {
-      //if (!IS_DEBUG) return;
-      ////TODO: bu yolun rengi farklı olmalı
-      //currPath = findPathTo.call(this, x, y, true);
-      //if (currPath) {
-      //  this.setPath(currPath, true);
-      //}
+      if (!IS_DEBUG) return;
+      //TODO: bu yolun rengi farklı olmalı
+      currPath = findPathTo.call(this, x, y, true);
+      if (currPath) {
+        this.setPath(currPath, true);
+      }
     }
     if (currPath) this.goal = [x, y];
   }
@@ -3598,8 +3598,12 @@ export class Game {
     let wanderer = new Car(this, "temp_car");
     let road = getRandom(possibleRoads)
     road = this.roads[road[0]][road[1]];
-    wanderer.setPosition(road.posX, road.posY);
-    wanderer.direction = connectionLookup[getRandom(getConnections(road.roadType, road._direction))] * 90;
+    let direction = getRandom(getConnections(road.roadType, road._direction))
+    //araçların sağ şeritte başlaması için
+    //araçların baktığı değil geldiği yönü almamız gerektiği için tersini alıyoruz
+    let laneOffset = getLaneOffset(getOpposite(direction),1,10)
+    wanderer.setPosition(road.posX+laneOffset[0], road.posY+laneOffset[1]);
+    wanderer.direction = connectionLookup[direction] * 90;
     wanderer.isWandering = true;
     wanderer.onIndexChange.push(() => {
       if (!inBounds(wanderer.gridIndexes)) {
