@@ -2546,7 +2546,6 @@ export class Road extends Entity {
       curr.zIndex = this.zIndex + 1;
       this.drawHighlight(index);
     }
-    console.log(this.gridIndexes.join(","),index,value)
     this.highlightToggles[index] = value;
     if(value!=this.highlightLines[index].visible){
       this.highlightLines[index].visible = value;
