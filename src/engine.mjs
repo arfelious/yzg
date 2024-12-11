@@ -1670,7 +1670,7 @@ export class Car extends MovableEntity {
   isOverriden=false
   isWaiting=0 //0 ise beklemiyor, 1 ise yaya/ışık bekliyor, 2 ise bekleyen birini bekliyor
   dominanceFactor=Math.random() //buna göre yol verecekler
-  patienceFactor=Math.floor(Math.random()*3000+3000)//sabır faktörü, sorun olunca buna göre bekleyecekler
+  patienceFactor=Math.floor(Math.random()*2000+2000)//sabır faktörü, sorun olunca buna göre bekleyecekler
   preventGoal=false
   massMultiplier=10
   set isWandering(value) {
@@ -1976,30 +1976,33 @@ export class Car extends MovableEntity {
       let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let backSensorsFree = backFreenes.every(e=>e)
       let freeBack = backFreenes.findIndex(e=>e)
-      if((backSensorsFree||freeBack!=-1)&&((frontUsability<-15||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0.1||absVelocity<6)){
-        //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
-        //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
-          if(IS_DEBUG)this.sprite.tint=0x00ff00
-          this.entityMoveLimiter=1
-          this.moveBackward(dt)
-          let currentSteeringMultiplier=backSensorsFree?-sumSign*1.5:freeBack==0?-2:2
-          this.steer(dt,currentSteeringMultiplier,true)
-        return
-      }else if(!carIsComing){
-        if(IS_DEBUG)this.sprite.tint=0x999999
-        let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.2:0:carIsComing?0.5:0.6
-        this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
-        let canAct = (hasDominance||!hasDynamicThreat)
-        if(canAct){
-          this.moveForward(dt)
+      let canAct = (hasDominance||!hasDynamicThreat)
+      if(canAct){
+        if(((backSensorsFree||freeBack!=-1)&&((frontUsability<0||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0.1||absVelocity<6))){
+          //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
+          //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
+            if(IS_DEBUG)this.sprite.tint=0x00ff00
+            this.entityMoveLimiter=1
+            this.moveBackward(dt)
+            let currentSteeringMultiplier=backSensorsFree?-sumSign*1.5:freeBack==0?-2:2
+            this.steer(dt,currentSteeringMultiplier,true)
+          return
+        }else{
+          if(IS_DEBUG)this.sprite.tint=0x999999
+          let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.2:0:carIsComing?0.2:0.6
+          this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
+          if(canAct){
+            this.moveForward(dt)
+          }
+          if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
+          if(sumSign!=this.laneMultiplier){
+            this.switchLane()
+          }
+          this.steer(dt,sumSign*1.25)
+          return this.isMain
         }
-        if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
-        if(sumSign!=this.laneMultiplier){
-          this.switchLane()
-        }
-      }
-      this.steer(dt,sumSign*1.25)
-      return this.isMain
+      }else return
+      return true
     }else{
       if(IS_DEBUG)this.sprite.tint=0xffffff
       this.entityMoveLimiter=1
@@ -3347,7 +3350,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       break;
     case "slippery":
       acceleration = 70;
-      drag = 3.3;
+      drag = 3;
       turnDrag = 1.23;
       alignment = 0.6;
       steering = 1.4;

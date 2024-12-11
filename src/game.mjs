@@ -75,17 +75,6 @@ window.addEventListener("keyup", (event) => {
 let frameText = "0";
 let lastUpdate = Date.now();
 let accumulatedTime = 0;
-const dropdowns = document.querySelectorAll(".model select");
-dropdowns.forEach((dropdown, index) => {
-  dropdown.addEventListener("change", () => {
-    const selectedValue = dropdown.value.split("-")[0]
-    if (index === 0) {
-      mainCar.pathAlgorithm = selectedValue;
-    } else {
-      mainCar.chosenAlgorithms[index - 1] = selectedValue;
-    }
-  });
-});
 let preventGoalActionCheckbox = document.getElementById("prevent-goal")
 if(preventGoalActionCheckbox){
   preventGoalActionCheckbox.addEventListener("change",()=>{
