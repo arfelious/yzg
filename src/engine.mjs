@@ -1932,6 +1932,7 @@ export class Car extends MovableEntity {
     let angleDifference = this.getGoalAngle()
     //ön yandaki sensörler 9 ve 10. indis
     let frontSensors = sensors.slice(0,5).concat([sensors[9],sensors[10]])
+    let mainBlockedByCar = sensors.slice(0,5).find(e=>e[0]<40&&e[1].entityType=="car")
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
     let threatCars = sensors.filter((e,i)=>e[1]&&e[1].entityType=="car")
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
@@ -1983,7 +1984,7 @@ export class Car extends MovableEntity {
       let backSensorsFree = backFreenes.every(e=>e)
       let freeBack = backFreenes.findIndex(e=>e)
       let canAct = (hasDominance||!hasDynamicThreat)
-      if(((backSensorsFree||freeBack!=-1)&&((frontUsability<-30||frontTriggered.length>1)&&((now-this.stationaryAt>400)||frontTriggered.length>2))&&(this.getAlignment()<=0||absVelocity<10))){
+      if(mainBlockedByCar||((backSensorsFree||freeBack!=-1)&&((frontUsability<-30||frontTriggered.length>1)&&((now-this.stationaryAt>400)||frontTriggered.length>2))&&(this.getAlignment()<=0||absVelocity<10))){
         let [sum,weightedSum] = this.getSensorSums()
         let sumSign = Math.abs(sum)<1?0:Math.sign(sum)
         //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
@@ -1997,7 +1998,7 @@ export class Car extends MovableEntity {
         //ya hemen önünde nesne olmadığında ya da araç olduğunda
         //ikisi beraberken çalışmamalı ki ileri gitmesin
         //xor
-      }else if(frontImpossibility<100!=hasDynamicThreat){
+      }else if(frontImpossibility<100!=hasDynamicThreat&&!mainBlockedByCar){
         let [sum,weightedSum] = this.getSensorSums(true)
         this.sumCounters[this.sumCounter++%5]=sum
         let lastSums = this.sumCounters.reduce((x,y)=>x+Math.sign(y)/*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/)
@@ -2017,6 +2018,10 @@ export class Car extends MovableEntity {
       }else{
         this.entityMoveLimiter=0.5
         if(frontImpossibility>30||hasDynamicThreat)this.brake(dt)
+        if(frontImpossibility<=30&&!mainBlockedByCar){
+          let [sum] = this.getSensorSums(false)
+          this.steer(dt,Math.sign(sum)*1.25)
+        }
         if(IS_DEBUG)this.sprite.tint=0x333333
         return true
       }
@@ -2692,13 +2697,13 @@ export class Pedestrian extends MovableEntity{
         this.velY=directionVector[1]*nonDirectionalSpeed
         //önünde araç varsa konumu az değişecek, konumu az değişirse kendisine göre sağa veya sola gitsin
         let effectiveSpeed = getMagnitude(this.posX-this.lastPosX,this.posY-this.lastPosY)
-        if(effectiveSpeed<0.2){ // yola göre yaya hızı değişmiyor, normal konum değişimleri 0.23-0.24 gibi
+        if(effectiveSpeed<0.1){ // yola göre yaya hızı değişmiyor, normal konum değişimleri 0.23-0.24 gibi
           if(this.tryDirectionCounter<3){
             //+= ile fazla birikebiliyor
             this.tryDirectionCounter=30
+            //rastgele yön denenmesi ama üst üste aynısının kullanılması için
+            this.lastAngleMultiplier=Math.round(Math.random())?1:-1
           }
-          //rastgele yön denenmesi ama üst üste aynısının kullanılması için
-          this.lastAngleMultiplier=Math.round(Math.random())?1:-1
         }
         let passedTickCount = this.tickCounter-this.passingStartedAt
         if(passedTickCount>1000){
@@ -2708,7 +2713,7 @@ export class Pedestrian extends MovableEntity{
         if(this.tryDirectionCounter>0){
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
-          nonDirectionalSpeed+=Math.min(30,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
+          nonDirectionalSpeed+=Math.min(20,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
           this.velX+=nonDirectionalSpeed*pedDirection[0]*2
           this.velY+=nonDirectionalSpeed*pedDirection[1]*2
         }
