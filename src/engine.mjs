@@ -1867,7 +1867,7 @@ export class Car extends MovableEntity {
     })
   }
   checkThreatCondition(){
-    return this.checkSensor(this.isMain||!this.isOnRoad()?REAL_THREATS:THREATS,100,this.sensors.slice(0,5))
+    return this.checkSensor(this.isMain||!this.isOnRoad()?REAL_THREATS:THREATS,120,this.sensors.slice(0,5).concat([this.sensors[9],this.sensors[10]]))
   }
   getSensorSums(isDynamic){
     let xorWith = isDynamic?1:0
@@ -1907,7 +1907,6 @@ export class Car extends MovableEntity {
     let frontTriggered = frontSensors.filter(e=>e[1]&&!NONPHYSICAL_THREATS.includes(e[1].entityType))
     let threatCars = sensors.filter((e,i)=>e[1]&&e[1].entityType=="car")
     let dominanceFactors = threatCars.map(e=>e[1].dominanceFactor)
-    let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)
     let hasDynamicThreat = threatCars.length>0||sensors.find(e=>e[1]&&e[1].entityType=="pedestrian")
     let [sum,weightedSum] = this.getSensorSums(hasDynamicThreat)
     let leftIsFullyDynamic = [sensors[5],sensors[7],sensors[9]].filter(e=>e[1]&&e[1].entityType=="car"&&e[0]<50).length>=2
@@ -1917,17 +1916,18 @@ export class Car extends MovableEntity {
     //xor
     if(leftIsFullyDynamic!=rightIsFullyDynamic){
       if(leftIsFullyDynamic){
-        sum=Math.max(sum,Number.EPSILON)
-      }else sum=Math.min(sum,-Number.EPSILON)
+        sum=Math.max(sum,0.1)
+      }else sum=Math.min(sum,-0.1)
     }
     let carIsComing = threatCars.length>0
     let otherCar
     let directionAlignment = 0
     if(carIsComing){
-      otherCar = threatCars[0]
-      let speedAlignment = dotProduct(toUnitVector([this.velX,this.velY]),toUnitVector([otherCar.velX,otherCar.velY]))
-      carIsComing=speedAlignment<-0.3
-      directionAlignment = dotProduct(toVector(this.direction),toUnitVector([otherCar.velX,otherCar.velY]))
+      carIsComing=threatCars.find(otherCar=>{
+        //let speedAlignment = dotProduct(toUnitVector([this.velX,this.velY]),toUnitVector([otherCar.velX,otherCar.velY]))
+        directionAlignment = dotProduct(toVector(this.direction),toUnitVector([otherCar.velX,otherCar.velY]))
+        return directionAlignment<-0.5
+      })
     }
     let absVelocity = this.absoluteVel()
     let allNonPhysical = sensors.every(e=>!e[1]||!threatsToUse.includes(e[1].entityType))
@@ -1941,8 +1941,11 @@ export class Car extends MovableEntity {
     }).reduce((x,y)=>x+y))
     if(absVelocity>16&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
+    let frontImpossibility = sensors.map(e=>e[1]?e[0]<25?25-e[0]:0:0).reduce((x,y)=>x+y)*3+this.lastColliders.filter(e=>e.entityType=="car").length*50
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
-    let frontUsability = frontPossibleness-frontCloseness*1.3+Math.max(0,(waitingFor-this.patienceFactor)/20)
+    let frontUsability = frontPossibleness-frontCloseness*1.3-frontImpossibility+Math.max(0,(waitingFor-this.patienceFactor)/15)
+    let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)||frontUsability>70
+
     //bekleme değeri normalde 0, ışık ve yaya geçidinde 1
     //ışıkta veya yaya geçidindeki aracı görenlerin ise 2+
     //2+ olanların isWaiting'te kalması için kendilerinden düşük ancak 0 olmayan isWaiting değerine sahip araç bulmalılar
@@ -1957,7 +1960,7 @@ export class Car extends MovableEntity {
       let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let backSensorsFree = backFreenes.every(e=>e)
       let freeBack = backFreenes.findIndex(e=>e)
-      if((backSensorsFree||freeBack!=-1)&&((frontUsability<-15||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0||absVelocity<4)){
+      if((backSensorsFree||freeBack!=-1)&&((frontUsability<-15||frontTriggered.length>0)&&(now-this.stationaryAt>200)||frontTriggered.length>=2)&&(this.getAlignment()<=0.1||absVelocity<6)){
         //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
         //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
           if(IS_DEBUG)this.sprite.tint=0x00ff00
@@ -1966,7 +1969,7 @@ export class Car extends MovableEntity {
           let currentSteeringMultiplier=backSensorsFree?-sumSign*1.5:freeBack==0?-2:2
           this.steer(dt,currentSteeringMultiplier,true)
         return
-      }else{
+      }else if(!carIsComing){
         if(IS_DEBUG)this.sprite.tint=0x999999
         let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.2:0:carIsComing?0.5:0.6
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
@@ -2526,7 +2529,6 @@ export class Road extends Entity {
     let coords = this.getHighlightCoordinates(index);
     let [startX, startY] = coords[0];
     let [endX, endY] = coords[1];
-    this.highlightLines[index].clear();
     this.highlightLines[index].moveTo(startX, startY).lineTo(endX, endY).stroke();
   }
   toggleHighlight(index, value = !this.highlightToggles[index]) {
@@ -2536,7 +2538,7 @@ export class Road extends Entity {
     }
     let curr = this.highlightLines[index];
     if (curr&&curr.destroyed) return;
-    if (!this.highlightLines[index]) {
+    if (!curr) {
       this.highlightLines[index] = new PIXI.Graphics();
       curr=this.highlightLines[index]
       this.highlightContainer.addChild(curr);
@@ -2544,6 +2546,7 @@ export class Road extends Entity {
       curr.zIndex = this.zIndex + 1;
       this.drawHighlight(index);
     }
+    console.log(this.gridIndexes.join(","),index,value)
     this.highlightToggles[index] = value;
     if(value!=this.highlightLines[index].visible){
       this.highlightLines[index].visible = value;
@@ -2626,7 +2629,7 @@ export class Pedestrian extends MovableEntity{
         this.velX=directionVector[0]*nonDirectionalSpeed
         this.velY=directionVector[1]*nonDirectionalSpeed
       }
-      if(Math.random()*1000<1){
+      if(Math.random()*2000<1){
         this.state="passing"
         this.passingStartedAt=this.tickCounter
       }
@@ -2654,17 +2657,17 @@ export class Pedestrian extends MovableEntity{
           //rastgele yön denenmesi ama üst üste aynısının kullanılması için
           this.lastAngleMultiplier=Math.round(Math.random())?1:-1
         }
+        let passedTickCount = this.tickCounter-this.passingStartedAt
+        if(passedTickCount>1000){
+          //karşıdan karşıya geçmesi bu kadar sürmemeli
+          this.isCollisionEffected=false
+        }
         if(this.tryDirectionCounter>0){
           this.tryDirectionCounter--
           let pedDirection = toVector(this.direction-90*this.lastAngleMultiplier)
-          let passedTickCount = this.tickCounter-this.passingStartedAt
           nonDirectionalSpeed+=Math.min(30,passedTickCount/10)*dt*PEDESTRIAN_MOVE_MULTIPLIER
           this.velX+=nonDirectionalSpeed*pedDirection[0]*2
           this.velY+=nonDirectionalSpeed*pedDirection[1]*2
-          if(passedTickCount>1000){
-            //karşıdan karşıya geçmesi bu kadar sürmemeli
-            this.isCollisionEffected=false
-          }
         }
         if(remainingRatio<0.03){
           this.state="turning"
