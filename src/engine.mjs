@@ -79,6 +79,7 @@ const REAL_THREATS = ["rogar","bariyer","cukur","car","pedestrian"]
 const PHYSICAL_THREATS = ["car","pedestrian","building","side"]
 const NONPHYSICAL_THREATS = ["yayaGecidi","light","kasis"]
 const ROAD_TYPES_ARR = ["straight", "rightcurve", "3", "4"];
+const CAR_SPRITES = [["car2.png",true,0.3,0.92],["temp_car.png",true,0.3,1]]
 //total 1 olmaları gerekmiyor
 const ROAD_CONDITION_WEIGHTS = {
   asphalt: 0.7,
@@ -266,11 +267,11 @@ const ROAD_TYPES_OBJ = Object.fromEntries(ROAD_TYPES_ARR.map((e, i) => [e, i]));
 const BUILDING_TOPS = ["bina_test.png","cati1.png"]
 const BUILDING_SIDES = ["bina_yan.png","bina1.png"]
 const PEDESTRIANS = ["yaya.png","yaya2.png","yaya3.png"]
-let imagesArray = ["temp_car.png", "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg","yaya.png", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS,  ...PEDESTRIANS];
+const CAR_IMAGES = CAR_SPRITES.map(e=>e[0])
+let imagesArray = [ "ocean.jpeg", "park alanı.jpg", "cim.jpg","sand.jpg","yaya.png", ...ROAD_IMAGES, ...OBSTACLE_IMAGES, ...LIGHT_IMAGES, ...BUILDING_SIDES, ...BUILDING_TOPS,  ...PEDESTRIANS, ...CAR_IMAGES];
 //Alta eklenen resimler ölçekleniyor, bellek kullanımını düşürmeye büyük katkı sağlıyor
 //2. değerin true olması durumunda resmin genişliği yerine yüksekliğine göre ölçekleniyor
 let intendedWidths = {
-  "temp_car.png": [CAR_WIDTH, true],
   "ocean.jpeg": [ROAD_WIDTH],
   "park alanı.jpg": [ROAD_WIDTH],
   "cim.jpg": [ROAD_WIDTH],
@@ -282,6 +283,7 @@ let toScale = [...ROAD_IMAGES.map(e=>[e, false]),
   ...BUILDING_SIDES.map(e=>[e,false]),
   ...BUILDING_TOPS.map(e=>[e,false]),
   ...PEDESTRIANS.map(e=>[e,true]),
+  ...CAR_IMAGES.map(e=>[e,true]),
 ];
 toScale.forEach(e=>(intendedWidths[e[0]] = [ROAD_WIDTH, e[1] || false]));
 const ROAD_TYPES = {
@@ -1270,8 +1272,9 @@ class Entity {
   init(sprite) {
     this.bounds = getBounds(sprite);
     let wh = sprite.getSize();
-    this.spriteWidth = this.spriteWidth??this.width;
     this.ratio = wh.height / wh.width;
+    if(this.height&&!this.width)this.width=this.height/this.ratio
+    this.spriteWidth = this.spriteWidth??this.width;
     this.scale = this.spriteWidth / wh.width;
     this.height = this.height??(this.forceSquare ? this.spriteWidth : this.spriteWidth * this.ratio);
     this.mass=this.mass??(this.width*this.height)*this.massMultiplier/10
@@ -1957,7 +1960,7 @@ export class Car extends MovableEntity {
     }).reduce((x,y)=>x+y))
     if(absVelocity>16&&!this.isGoingBackwards())this.stationaryAt=now
     let waitingFor = now-this.stationaryAt
-    let frontImpossibility = sensors.map(e=>e[1]?e[0]<25?25-e[0]:0:0).reduce((x,y)=>x+y)*3+this.lastColliders.filter(e=>e.entityType=="car").length*50
+    let frontImpossibility = sensors.map(e=>e[1]?e[0]<25?25-e[0]:0:0).reduce((x,y)=>x+y)*3+(this.lastColliders?.filter(e=>e.entityType=="car").length||0)*50
     // nesnenin random sabır süresi kadar ms bekledikten sonra yavaş yavaş agresiflik artıyor
     let frontUsability = frontPossibleness-frontCloseness*1.3-frontImpossibility+Math.max(0,(waitingFor-this.patienceFactor)/15)
     let hasDominance = this.dominanceFactor==Math.max(this.dominanceFactor,...dominanceFactors)||frontUsability>70
@@ -2352,12 +2355,20 @@ export class Car extends MovableEntity {
   }
   constructor(game, spritePath, createGraphics = false) {
     super(game);
+    let chosenCar
+    if(!spritePath){
+      chosenCar=getRandom(CAR_SPRITES)
+      spritePath=chosenCar[0]
+    }
+    else chosenCar=CAR_SPRITES.find(e=>e[0]==spritePath)
+    this.directionOffset=chosenCar[1]?90:0
+    this.anchorX=chosenCar[2]
     this.setVehicleProperties();
     this.onIndexChange.push(this.setRoad);
     this.onIndexChange.push(this.resetPath);
     this.onIndexChange.push(this.setVehicleProperties);
     this.childGraphics.push(this.customLine);
-    this.width = CAR_WIDTH;
+    this.width = CAR_WIDTH*chosenCar[3]
     this.createGraphics = createGraphics;
     this.drawBounds = createGraphics;
     this.sprite = spritePath;
@@ -3617,7 +3628,7 @@ export class Game {
       return !this.cars.find(car=>arrayEquals(car.gridIndexes,e))
     })
     if(possibleRoads.length==0)return
-    let wanderer = new Car(this, "temp_car");
+    let wanderer = new Car(this);
     let road = getRandom(possibleRoads)
     road = this.roads[road[0]][road[1]];
     let direction = getRandom(getConnections(road.roadType, road._direction))
@@ -3645,7 +3656,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(dt,this.globalColliders,30,1,1)
+      resolveAllCollisions(dt,this.globalColliders,30,0.5,1)
     }
     this.globalColliders = new Set();
     this.tickCounter++;

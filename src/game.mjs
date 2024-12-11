@@ -17,7 +17,7 @@ window.game=game
 let currentStart =
 game.possibleStarts[Math.floor(Math.random() * game.possibleStarts.length)];
 let roadOffsetY = currentStart * ROAD_WIDTH;
-let mainCar = new MainCar(game, "temp_car");
+let mainCar = new MainCar(game, "temp_car.png");
 window.mainCar = mainCar;
 mainCar.setPosition(80, 100 + roadOffsetY);
 game.setWanderers()
