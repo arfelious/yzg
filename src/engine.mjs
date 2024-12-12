@@ -49,7 +49,7 @@ await app.init({
   autoDensity: true,
 });
 const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-const IS_PROD = false
+const IS_PROD = true
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -214,7 +214,8 @@ const OBSTACLES = {
     useWidthAsHeight: false,
     lanes: 1,
     roadCondition:"slippery",
-    roadConditionInverted:false
+    roadConditionInverted:false,
+    weight:2
   },
   stopLevha: {
     isOnRoad: false,
@@ -226,7 +227,7 @@ const OBSTACLES = {
     roadCondition:"slippery",
     roadConditionInverted:true,
     crossOnly:true,
-    weight:0.5
+    weight:0.8
   },
 };
 const OBSTACLE_SIGNS = [];
@@ -2155,7 +2156,7 @@ export class Car extends MovableEntity {
     if(!res)return true
     //sensörle varlığına bakıyoruz ama yalnızca birikintinin üzerindeyse sürtünmeyi düşürüyoruz
     let isOnPuddle = this.lastColliders?.find(e=>e.entityType=="puddle")
-    this.customDragMultiplier=isOnPuddle?0.7:1
+    this.customDragMultiplier=isOnPuddle?0.65:1
     this.entityMoveLimiter=0.5
     return true
   }
