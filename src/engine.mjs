@@ -902,7 +902,7 @@ export function calculateVehicleProperties(roadCondition, isTurning = false, isB
   // Yol koşullarına göre hız, ivme ve sürtünme değerleri belirleniyor
   switch (roadCondition) {
     case "dirt":
-      acceleration = 80;
+      acceleration = 85;
       drag = 6;
       turnDrag = 1.2;
       alignment = 0.45;
