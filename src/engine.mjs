@@ -1676,6 +1676,7 @@ export class Car extends MovableEntity {
   patienceFactor=Math.floor(Math.random()*2000+2000)//sabır faktörü, sorun olunca buna göre bekleyecekler
   preventGoal=false
   massMultiplier=10
+  canStart=false
   set isWandering(value) {
     this._isWandering = value;
   }
@@ -1828,7 +1829,7 @@ export class Car extends MovableEntity {
     this.preventSigns=[]
   }
   getAction() {
-    if(!this.isOverriden){
+    if(!this.isOverriden&&(this.canStart||!this.isMain)){
       let threatAction = this.getThreatAction(this.chosenAlgorithms[0]);
       if (threatAction !== null) {
         this.lastActionType="threat"
@@ -1839,12 +1840,13 @@ export class Car extends MovableEntity {
         this.lastActionType="rule"
         return ruleAction;
       }
-    }
+    }else if(this.isOverriden&&!this.canStart)this.canStart=true
     //kurallar ve tehditler hızı sınırlayabiliyor, o sınır kaldırılıyor
     this.resetChanged()
     let goalAction = this.getGoalAction(this.chosenAlgorithms[2]);
     if (goalAction !== null){
       this.lastActionType="goal"
+      if(!this.canStart)this.canStart=true
       return goalAction;
     }
     return null;
@@ -2001,11 +2003,11 @@ export class Car extends MovableEntity {
       }else if(frontImpossibility<100!=hasDynamicThreat&&!mainBlockedByCar){
         let [sum,weightedSum] = this.getSensorSums(true)
         this.sumCounters[this.sumCounter++%5]=[sum,now]
-        let lastSums = this.sumCounters.filter(e=>now-e[1]<100).map(e=>e[0]).reduce((x,y)=>x+Math.sign(y)) /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
+        let lastSums =sum|| this.sumCounters.filter(e=>now-e[1]<100).map(e=>e[0]).reduce((x,y)=>x+Math.sign(y)) /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
         if(typeof angleDifference=="number")lastSums+=Math.sign(angleDifference)
-        let sumSign = Math.abs(lastSums)<3?0:Math.sign(lastSums)
+        let sumSign = Math.sign(lastSums)
         if(IS_DEBUG)this.sprite.tint=0x999999
-        let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.5:0:0.5
+        let minimum = this.isWaiting?0:frontUsability<-30?frontUsability>10&&!bothTriggereed?0.6:0:0.6
         this.entityMoveLimiter=Math.max(minimum,this.entityMoveLimiter-this.absoluteVel()/100)
         if(canAct){
           this.moveForward(dt)
@@ -2021,7 +2023,8 @@ export class Car extends MovableEntity {
         if(frontImpossibility>30||hasDynamicThreat)this.brake(dt)
         if(frontImpossibility<=50&&!mainBlockedByCar){
           let [sum] = this.getSensorSums(false)
-          this.steer(dt,Math.sign(sum)*1.25)
+          let sumSign = Math.abs(sum)<3?0:Math.sign(sum)
+          this.steer(dt,sumSign*1.25)
         }
         if(IS_DEBUG)this.sprite.tint=0x333333
         return true
@@ -3395,7 +3398,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       turnDrag = 1.1;
       alignment = 0.5;
       steering = 1.4;
-      turnLimiters = [3.6, 1.25];
+      turnLimiters = [4, 1.25];
   }
   if (isTurning) {
     acceleration *= 0.9;
