@@ -1,5 +1,5 @@
 import { Building, Car, Light, Obstacle, Ocean, Park, Road } from "./classes.mjs";
-import { BUILDING_SIDES, BUILDING_TOPS, CAR_IMAGES, CHANCE_ROAD_WEIGHTS, DEFAULT_LIGHT_DISTANCE, DIRECTION_ALTERNATIVE, GRID_HEIGHT, GRID_WIDTH, HEIGHT, IS_PROD, LIGHT_IMAGES, OBSTACLES, OBSTACLES_WITH_SIGN, OBSTACLE_IMAGES, OBSTACLE_IMAGE_TO_NAME, OBSTACLE_SIGNS, PATH_START_INDEX, PEDESTRIANS, PHYSICAL_THREATS, ROAD_CONDITION_ARR, ROAD_CONDITION_INDEXES, ROAD_CONDITION_WEIGHTS, ROAD_IMAGES, ROAD_TYPES, ROAD_TYPES_ARR, ROAD_TYPES_OBJ, ROAD_WIDTH, WIDTH, angleLookup, connectionArray, connectionLookup } from "./constants.mjs";
+import { BUILDING_SIDES, BUILDING_TOPS, CAR_IMAGES, CHANCE_ROAD_WEIGHTS, DEFAULT_LIGHT_DISTANCE, DIRECTION_ALTERNATIVE, GRID_HEIGHT, GRID_WIDTH, HEIGHT, IS_PROD, LIGHT_IMAGES, OBSTACLES, OBSTACLES_WITH_SIGN, OBSTACLE_IMAGES, OBSTACLE_IMAGE_TO_NAME, OBSTACLE_SIGNS, PATH_START_INDEX, PEDESTRIANS, PHYSICAL_THREATS, ROAD_CONDITION_ARR, ROAD_CONDITION_INDEXES, ROAD_CONDITION_WEIGHTS, ROAD_IMAGES, ROAD_TYPES, ROAD_TYPES_ARR, ROAD_TYPES_OBJ, ROAD_WIDTH, WIDTH, angleLookup, connectionArray, connectionLookup ,USE_TEST_DATA,testData} from "./constants.mjs";
 export let highlightStyle = {
   color: 0x006699,
   width: 4,
@@ -1213,7 +1213,7 @@ export class Game {
       entity.tick(dt);
     });
     if(this.resolveCollision){
-      resolveAllCollisions(dt,this.globalColliders,20,0.2,1)
+      resolveAllCollisions(dt,this.globalColliders,20,0.3,0.9)
     }
     this.globalColliders = new Set();
     this.tickCounter++;
@@ -1223,7 +1223,7 @@ export class Game {
     this.entities.forEach(e=>e.setGraphics());
   }
   setMap() {
-    this.map = pruneRoads(createMap());
+    this.map = pruneRoads(USE_TEST_DATA?testData[0]:createMap());
   }
   setRoads() {
     let roads = [];

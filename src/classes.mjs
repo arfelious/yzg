@@ -781,7 +781,7 @@ export class Car extends MovableEntity {
     //sağ veya sol sensörlerin tamamını araçlar kaplıyorsa o yöne gidilmemeli
     //yavaşlamanın koşulları arttırılmalı
     let isOnRoad = this.isOnRoad();
-    let threatsToUse = isOnRoad ? REAL_THREATS : THREATS;
+    let threatsToUse = isOnRoad ? THREATS : REAL_THREATS;
     let angleDifference = this.getGoalAngle();
     //ön yandaki sensörler 9 ve 10. indis
     let frontSensors = sensors.slice(0, 5).concat([sensors[9], sensors[10]]);
@@ -843,7 +843,7 @@ export class Car extends MovableEntity {
         let sumSign = Math.abs(sum) < 1 ? 0 : Math.sign(sum);
         //araç/tehdit yaklaşmıyorsa en erken 0.2 saniye sonra geri gidebiliyor
         //if(frontTriggered.length>0&&((now-this.stationaryAt>200)&&(backSensorsFree||freeBack!=-1))){
-        if (IS_DEBUG) this.sprite.tint = 65280;
+        if (IS_DEBUG) this.sprite.tint = 0x00ff00;
         this.entityMoveLimiter = 1;
         this.moveBackward(dt);
         let currentSteeringMultiplier = backSensorsFree ? -sumSign * 1.5 : freeBack == 0 ? -2 : 2;
@@ -858,7 +858,7 @@ export class Car extends MovableEntity {
         let lastSums = sum || this.sumCounters.filter(e => now - e[1] < 100).map(e => e[0]).reduce((x, y) => x + Math.sign(y)); /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
         if (typeof angleDifference == "number") lastSums += Math.sign(angleDifference);
         let sumSign = Math.sign(lastSums);
-        if (IS_DEBUG) this.sprite.tint = 10066329;
+        if (IS_DEBUG) this.sprite.tint = 0x999999;
         let minimum = this.isWaiting ? 0 : frontUsability < -30 ? frontUsability > 10 && !bothTriggereed ? 0.6 : 0 : 0.6;
         this.entityMoveLimiter = Math.max(minimum, this.entityMoveLimiter - this.absoluteVel() / 100);
         if (canAct) {
@@ -866,10 +866,10 @@ export class Car extends MovableEntity {
         }
         if (!canAct || this.entityMoveLimiter == 0) this.brake(dt);
         if (sumSign != this.laneMultiplier) {
-          if (!allNonPhysical) this.switchLane();
+           this.switchLane();
         }
-        this.steer(dt, sumSign * 1.3);
-        return this.isMain;
+        this.steer(dt, sumSign * 1.4);
+        return
       } else {
         this.entityMoveLimiter = 0.7;
         if (frontImpossibility > 30 || hasDynamicThreat) this.brake(dt);
@@ -878,11 +878,12 @@ export class Car extends MovableEntity {
           let sumSign = Math.sign(sum);
           this.steer(dt, sumSign * 1.3);
         }
-        if (IS_DEBUG) this.sprite.tint = 3355443;
+        if (allNonPhysical) this.resetChanged();
+        if (IS_DEBUG) this.sprite.tint = 0x333333;
         return true;
       }
     } else {
-      if (IS_DEBUG) this.sprite.tint = 16777215;
+      if (IS_DEBUG) this.sprite.tint = 0xffffff;
       this.entityMoveLimiter = 1;
       if (allNonPhysical) this.resetChanged();
       return true;
@@ -893,6 +894,12 @@ export class Car extends MovableEntity {
     if (chosenAlgorithm == "rule") {
       if (this.checkPedThreatCondition()) {
         return this.#pedAction;
+      }
+      if (this.checkLightCondition()) {
+        return this.#lightAction;
+      }
+      if (this.checkStopCondition()) {
+        return this.#stopAction;
       }
       if (this.checkThreatCondition()) {
         return this.#threatAction;
@@ -1019,12 +1026,6 @@ export class Car extends MovableEntity {
       if (this.checkPedRuleCondition()) {
         return this.#pedAction;
       }
-      //if(this.isMain&&this.checkLaneCondition()){
-      //  return this.#laneAction
-      //}
-      if (this.checkLightCondition()) {
-        return this.#lightAction;
-      }
       if (this.checkBumpCondition()) {
         return this.#bumpAction;
       }
@@ -1033,9 +1034,6 @@ export class Car extends MovableEntity {
       }
       if (this.checkPuddleCondition()) {
         return this.#puddleAction;
-      }
-      if (this.checkStopCondition()) {
-        return this.#stopAction;
       }
     }
     return null;

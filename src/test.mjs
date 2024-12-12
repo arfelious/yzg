@@ -1,4 +1,5 @@
 import {createMap,findPath} from "./engine.mjs";
+import {testData} from "./constants.mjs"
 const CREATE_TEST = false
 let getRandom =(grid) => {
     let x = Math.floor(Math.random() * grid.length);
@@ -51,7 +52,6 @@ if(CREATE_TEST){
     window.testResult=findDifferent()
     console.log("copy(JSON.stringify(testResult) yazarak sonuç kopyalanabilir")
 }else{
-    let testData = [[[[1,90,0,1],[1,270,0,1],[0,270,1,0],[0,270,0,1],[1,0,0,2],[1,180,1,2]],[[0,180,0,2],[3,270,0,1],[2,0,2,0],[0,90,0,1],[0,270,2,2],[-1,-1]],[[1,0,1,0],[3,270,0,0],[1,180,2,0],[0,90,0,1],[2,180,2,2],[1,270,0,2]],[[0,90,2,0],[1,90,0,1],[0,0,0,1],[1,180,2,1],[0,90,0,2],[0,90,0,2]],[[1,90,0,0],[0,180,0,0],[2,90,0,0],[1,270,0,0],[0,90,0,2],[0,90,0,2]],[[0,0,2,2],[1,270,2,2],[0,270,1,1],[0,270,0,0],[0,90,0,2],[2,180,0,2]],[[-1,-1],[0,90,2,2],[1,90,1,1],[3,270,0,0],[3,270,0,1],[3,180,0,1]],[[1,0,2,1],[3,90,0,1],[2,90,0,1],[2,0,0,0],[0,90,0,2],[1,90,0,2]]],[3,1],[7,2]]
     let [grid,randStart,randEnd] = testData
     let paths = algorithms.map(algorithm => findPath(grid, algorithm, randStart, randEnd));
     const dfsPath = paths[0];
