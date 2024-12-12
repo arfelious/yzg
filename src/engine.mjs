@@ -2054,7 +2054,7 @@ export class Car extends MovableEntity {
     return this.checkSensor("road",20,[this.sensors[8],this.sensors[10]],true)
   }
   checkLightCondition(){
-    let res = this.checkSensor("light",80)
+    let res = this.checkSensor("light",100)
     if(res&&res[1].state!=LIGHT_STATES[2])return res
     return false
   }
