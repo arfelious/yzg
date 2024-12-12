@@ -14,8 +14,10 @@ export const PATH_START_INDEX = 2;
 export const BUILDING_MULTIPLIER = 0.9;
 export const LIGHT_CHANGE_TICK = 700;
 export const DEFAULT_LIGHT_DISTANCE = 200;
-export const PEDESTRIAN_MOVE_MULTIPLIER = 50;export const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+export const PEDESTRIAN_MOVE_MULTIPLIER = 50;
+export const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
 export const IS_PROD = true;
+export const USE_TEST_DATA = false
 export const THREATS = ["rogar", "bariyer", "cukur", "car", "road", "pedestrian"];
 export const REAL_THREATS = ["rogar", "bariyer", "cukur", "car", "pedestrian"];
 export const PHYSICAL_THREATS = ["car", "pedestrian", "building", "side"];
@@ -169,7 +171,7 @@ export const OBSTACLES = {
     roadCondition: "slippery",
     roadConditionInverted: true,
     crossOnly: true,
-    weight: 0.2
+    weight: 0.1
   },
 };
 export const OBSTACLE_SIGNS = [];
@@ -243,4 +245,4 @@ export const CHANCE_ROAD_WEIGHTS = {
   4: 0.5,
 };
 export const LIGHT_STATES = ["RED", "YELLOW", "GREEN"];
-
+export let testData = [[[[1,90,0,1],[1,270,0,1],[0,270,1,0],[0,270,0,1],[1,0,0,2],[1,180,1,2]],[[0,180,0,2],[3,270,0,1],[2,0,2,0],[0,90,0,1],[0,270,2,2],[-1,-1]],[[1,0,1,0],[3,270,0,0],[1,180,2,0],[0,90,0,1],[2,180,2,2],[1,270,0,2]],[[0,90,2,0],[1,90,0,1],[0,0,0,1],[1,180,2,1],[0,90,0,2],[0,90,0,2]],[[1,90,0,0],[0,180,0,0],[2,90,0,0],[1,270,0,0],[0,90,0,2],[0,90,0,2]],[[0,0,2,2],[1,270,2,2],[0,270,1,1],[0,270,0,0],[0,90,0,2],[2,180,0,2]],[[-1,-1],[0,90,2,2],[1,90,1,1],[3,270,0,0],[3,270,0,1],[3,180,0,1]],[[1,0,2,1],[3,90,0,1],[2,90,0,1],[2,0,0,0],[0,90,0,2],[1,90,0,2]]],[3,1],[7,2]]
