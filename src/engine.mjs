@@ -227,7 +227,7 @@ const OBSTACLES = {
     roadCondition:"slippery",
     roadConditionInverted:true,
     crossOnly:true,
-    weight:0.8
+    weight:0.2
   },
 };
 const OBSTACLE_SIGNS = [];
@@ -1988,7 +1988,7 @@ export class Car extends MovableEntity {
     //bekleme değeri normalde 0, ışık ve yaya geçidinde 1
     //ışıkta veya yaya geçidindeki aracı görenlerin ise 2+
     //2+ olanların isWaiting'te kalması için kendilerinden düşük ancak 0 olmayan isWaiting değerine sahip araç bulmalılar
-    this.isWaiting=threatCars.find(e=>e[0]<60&&e[1].isWaiting!=0&&e[1].isWaiting<4&&(this.isWaiting==0||e[1].isWaiting<this.isWaiting))?.[1].isWaiting||0
+    this.isWaiting=threatCars.find(e=>e[0]<75&&e[1].isWaiting!=0&&e[1].isWaiting<4&&(this.isWaiting==0||e[1].isWaiting<this.isWaiting))?.[1].isWaiting||0
     if(this.isWaiting){
       this.isWaiting++
       return this.isMain
@@ -2015,7 +2015,7 @@ export class Car extends MovableEntity {
         //ikisi beraberken çalışmamalı ki ileri gitmesin
         //xor
       }else if(frontImpossibility<100!=hasDynamicThreat&&!mainBlockedByCar){
-        let [sum,weightedSum] = this.getSensorSums(true)
+        let [sum,weightedSum] = this.getSensorSums(hasDynamicThreat)
         this.sumCounters[this.sumCounter++%5]=[sum,now]
         let lastSums =sum|| this.sumCounters.filter(e=>now-e[1]<100).map(e=>e[0]).reduce((x,y)=>x+Math.sign(y)) /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
         if(typeof angleDifference=="number")lastSums+=Math.sign(angleDifference)
@@ -2027,7 +2027,7 @@ export class Car extends MovableEntity {
           this.moveForward(dt)
         }
         if(!canAct||this.entityMoveLimiter==0)this.brake(dt)
-        if(sumSign&&sumSign!=this.laneMultiplier&&sumSign==-1){
+        if(sumSign!=this.laneMultiplier){
           if(!allNonPhysical)this.switchLane()
         }
         this.steer(dt,sumSign*1.3)
@@ -2036,7 +2036,7 @@ export class Car extends MovableEntity {
         this.entityMoveLimiter=0.7
         if(frontImpossibility>30||hasDynamicThreat)this.brake(dt)
         if(frontImpossibility<=50&&!mainBlockedByCar){
-          let [sum] = this.getSensorSums(false)
+          let [sum] = this.getSensorSums(hasDynamicThreat)
           let sumSign = Math.sign(sum)
           this.steer(dt,sumSign*1.3)
         }
@@ -2079,8 +2079,8 @@ export class Car extends MovableEntity {
       return true
     }
     let [dist,light] = res
-    if((light.state==LIGHT_STATES[0]&&dist<50)||(light.state==LIGHT_STATES[1]&&dist>=40)){
-      this.entityMoveLimiter*=0.7
+    if((light.state==LIGHT_STATES[0]&&dist<60)||(light.state==LIGHT_STATES[1]&&dist>=40)){
+      this.entityMoveLimiter*=0.5
       this.brake(dt)
       this.isWaiting=1
     }else this.isWaiting=0
@@ -2135,7 +2135,7 @@ export class Car extends MovableEntity {
     let res = this.checkSensor(["yayaGecidi","pedestrian"],120)
     if(!res){
       this.resetChanged()
-      return false
+      return true
     }
     let [dist,entity] = res
     if(entity.entityType=="pedestrian"||(entity.entityType=="yayaGecidi"&&entity.pedestrians.find(e=>e.state=="passing"))){
@@ -3396,7 +3396,7 @@ function calculateVehicleProperties(roadCondition, isTurning = false, isBraking 
       break;
     case "slippery":
       acceleration = 70;
-      drag = 3.1;
+      drag = 3.2;
       turnDrag = 1.23;
       alignment = 0.6;
       steering = 1.4;
@@ -3920,7 +3920,7 @@ export class Game {
     }
     if (obstacleAmount < this.maxObstacles) {
       let remaining = this.maxObstacles - obstacleAmount;
-      let chosenAmount = Math.max(remaining,2)+Math.floor(Math.random()*2)//normalde kalan engel miktarı kadar, aksi takdirde 2+ adet ışık
+      let chosenAmount = 10||Math.max(remaining,2)+Math.floor(Math.random()*2)//normalde kalan engel miktarı kadar, aksi takdirde 2+ adet ışık
       let remainingRoads = shuffle(this.possibleRoads.filter(e=>{
         let road = this.roads[e[0]][e[1]]
         return road.roadCondition!="dirt"&&road.obstacles.length == 0
