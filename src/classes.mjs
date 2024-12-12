@@ -865,7 +865,7 @@ export class Car extends MovableEntity {
           this.moveForward(dt);
         }
         if (!canAct || this.entityMoveLimiter == 0) this.brake(dt);
-        if (sumSign != this.laneMultiplier) {
+        if (sumSign != this.laneMultiplier&&this.laneMultiplier==-1) {
            this.switchLane();
         }
         this.steer(dt, sumSign * 1.4);
@@ -874,11 +874,11 @@ export class Car extends MovableEntity {
         this.entityMoveLimiter = 0.7;
         if (frontImpossibility > 30 || hasDynamicThreat) this.brake(dt);
         if (frontImpossibility <= 50 && !mainBlockedByCar) {
+          this.moveForward(dt)
           let [sum] = this.getSensorSums(hasDynamicThreat);
           let sumSign = Math.sign(sum);
-          this.steer(dt, sumSign * 1.3);
+          this.steer(dt, sumSign * 1.4);
         }
-        if (allNonPhysical) this.resetChanged();
         if (IS_DEBUG) this.sprite.tint = 0x333333;
         return true;
       }
