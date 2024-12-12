@@ -1,25 +1,4 @@
-/*
-    PRIORITY:
-          model
-          şerit takip düzeltme
-          tehdit algılama düzeltme
-          collision resolution
-    TODO:
-          GENEL OPTİMİZASYON
-          sabit nesne collision
-          normal collision
-          ışık sınır
-          resim isimleri ve koddaki halleri tutarlı hale getirilecek, boşluklu isimler vs. düzeltilecek
-      MAYBE:
-        budama
-        model basıyor olsa da basılan butonlar WASD kısmında gösterilmeli
-*/
-// \s*\?\s*([.?])\s* ?$1
-// "([^"]*)' "$1"
-// \(e\)\s*=>[\n\s]* e=>
-
 import { Car, Road, Ocean, Building, Park, Obstacle, Light } from "./classes.mjs";
-
 // Sabitler
 export const WIDTH = 1200;
 export const HEIGHT = 900;
@@ -1320,7 +1299,7 @@ let resolveAllCollisions = (dt, entities, maxIterations = 10, elasticity = 1, co
 // araçların tek eksende çarpması durumunda diğer eksende hareket edebilmeleri için eksenlerin ayrı halledilmesi gerekiyor
 // gamedev.stackexchange.com/a/160253
 let resolveAxis = (axisIndex, overlapAmount, entity1, entity2, dt, elasticity, correctionFactor, impulseCorrection) => {
-  let isX = axisIndex == 0;
+  let isX = axisIndex ==0;
   let normalizedNormal =overlapAmount //isX ? Math.sign(overlapAmount) : Math.sign(overlapAmount);
   let relativeVelocity = isX ? entity2.velX - entity1.velX : entity2.velY - entity1.velY;
   let relVelAlongNormal = relativeVelocity * normalizedNormal;
