@@ -1,4 +1,4 @@
-import {createMap,findPath} from "../src/engine.mjs";
+import {createMap,findPath} from "./engine.mjs";
 const CREATE_TEST = false
 let getRandom =(grid) => {
     let x = Math.floor(Math.random() * grid.length);
