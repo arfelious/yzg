@@ -48,8 +48,8 @@ await app.init({
   antialias: true,
   autoDensity: true,
 });
-const IS_DEBUG = false; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
-const IS_PROD = true
+const IS_DEBUG = true; //Yapılacak değişiklik engine.mjs üzerinde değilse kapalı kalsın, diğer şeyleri etkilemediğini kontrol etmek için kullanılacak
+const IS_PROD = false
 const DIRECTION_ALTERNATIVE = 1; // 1 ya da 2 olabilir, kullanım gerekçeleri yorum olarak açıklandı
 const PERSPECTIVE = [0.5, 0.5]; // Binalar varsayılan olarak ortadan bakan birinin göreceği şekilde 3d çiziliyor, başka oyunlarda yine kuş bakışı olmasına rağmen yukarıdan veya aşağıdan bakılmış gibi çizenler olmuş, belirtilen değerler sırasıyla genişlik ve yüksekliğe göre ölçekleniyor
 let changeImageResolution = async (texture, options) => {
@@ -122,7 +122,7 @@ const OBSTACLES = {
   bariyer: {
     isOnRoad: true,
     roadTypes: ["straight"],
-    width: CAR_WIDTH*8/9,
+    width: CAR_WIDTH*15/18,
     image: "bariyer.png",
     useWidthAsHeight: true,
     lanes: 1,
@@ -1723,7 +1723,7 @@ export class Car extends MovableEntity {
     } else {
       if (!IS_DEBUG) return;
       //TODO: bu yolun rengi farklı olmalı
-      currPath = findPathTo.call(this, x, y, true);
+      currPath = this.findPathTo(this, x, y, true);
       if (currPath) {
         this.setPath(currPath, true);
       }
@@ -1915,6 +1915,7 @@ export class Car extends MovableEntity {
     return checkIsOnRoad(this,this.currentRoad)
   }
   frontCounters=[]
+  frontCounter=0
   dominanceCounters=[]
   sumCounters=[]
   sumCounter=0
@@ -1942,7 +1943,7 @@ export class Car extends MovableEntity {
     let leftIsFullyDynamic = [sensors[5],sensors[7],sensors[9]].filter(e=>e[1]&&e[1].entityType=="car"&&e[0]<50).length>=2
     let rightIsFullyDynamic = [sensors[6],sensors[8],sensors[10]].filter(e=>e[1]&&e[1].entityType=="car"&&e[0]<50).length>=2
     //üst üste threatAction olması durumunda 2 saniyelik veri
-    let index=this.tickCounter%(Math.floor(1/this.game.gameTick)*2)
+    let index=this.frontCounter++%(Math.floor(1/this.game.gameTick)*2)
     this.frontCounters[index]=mainTriggered
     let carIsComing = threatCars.length>0
     let otherCar
@@ -1980,7 +1981,8 @@ export class Car extends MovableEntity {
       this.isWaiting++
       return this.isMain
     }
-    if(this.frontCounters.filter(e=>e).length>30||mainTriggered||absVelocity<1||this.isGoingBackwards()||waitingFor>3000){
+    let frontCounterAmount = this.frontCounters.filter(e=>e).length
+    if((frontCounterAmount>30||frontCounterAmount/this.frontCounters.length>0.8)||mainTriggered||absVelocity<1||this.isGoingBackwards()||waitingFor>3000){
       //aniden geri gitmemesi için ya zaten geriye giderken ya da hızı çok düşükken geri gitmeye başlıyor
       let backFreenes = back.map(e=>e[0]>20||e[1]==null||(!THREATS.includes(e[1].entityType)))
       let backSensorsFree = backFreenes.every(e=>e)
@@ -2016,15 +2018,15 @@ export class Car extends MovableEntity {
         if(sumSign&&sumSign!=this.laneMultiplier&&sumSign==-1){
           if(!allNonPhysical)this.switchLane()
         }
-        this.steer(dt,sumSign*1.25)
+        this.steer(dt,sumSign*1.3)
         return this.isMain
       }else{
         this.entityMoveLimiter=0.7
         if(frontImpossibility>30||hasDynamicThreat)this.brake(dt)
         if(frontImpossibility<=50&&!mainBlockedByCar){
           let [sum] = this.getSensorSums(false)
-          let sumSign = Math.abs(sum)<3?0:Math.sign(sum)
-          this.steer(dt,sumSign*1.25)
+          let sumSign = Math.sign(sum)
+          this.steer(dt,sumSign*1.3)
         }
         if(IS_DEBUG)this.sprite.tint=0x333333
         return true
@@ -2141,7 +2143,7 @@ export class Car extends MovableEntity {
     let res = this.checkPuddleCondition()
     if(!res)return true
     //sensörle varlığına bakıyoruz ama yalnızca birikintinin üzerindeyse sürtünmeyi düşürüyoruz
-    let isOnPuddle = this.lastColliders.find(e=>e.entityType=="puddle")
+    let isOnPuddle = this.lastColliders?.find(e=>e.entityType=="puddle")
     this.customDragMultiplier=isOnPuddle?0.7:1
     this.entityMoveLimiter=0.5
     return true
