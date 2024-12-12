@@ -1,15 +1,5 @@
-import {
-  app,
-  WIDTH,
-  HEIGHT,
-  Game,
-  Car,
-  MainCar,
-  ROAD_WIDTH,
-  BitmapText,
-  arrayEquals,
-  getIndexes,
-} from "../src/engine.mjs";
+import { app, WIDTH, HEIGHT, Game, ROAD_WIDTH, BitmapText, arrayEquals, getIndexes} from "./engine.mjs";
+import {MainCar} from "./classes.mjs"
 const FIXED_LOOP_MS = 7;
 const FIXED_LOOP_S = FIXED_LOOP_MS / 1000;
 let game = new Game(app.stage,FIXED_LOOP_S);
