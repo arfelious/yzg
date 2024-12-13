@@ -925,7 +925,7 @@ export function calculateVehicleProperties(roadCondition, isTurning = false, isB
       turnDrag = 1.1;
       alignment = 0.5;
       steering = 1.4;
-      turnLimiters = [4, 1.25];
+      turnLimiters = [4.25, 1.25];
   }
   if (isTurning) {
     acceleration *= 0.9;

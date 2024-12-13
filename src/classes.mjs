@@ -748,7 +748,7 @@ export class Car extends MovableEntity {
   getSensorSums(isDynamic) {
     let xorWith = isDynamic ? 1 : 0;
     let sensors = this.sensors.slice(0, 11).map(e => e.output);
-    let increasers = [0, 1 ^ xorWith, -1 ^ xorWith, 3 ^ xorWith, -2 ^ xorWith, -1.5, 1, -1.5, 1, -1, 1];
+    let increasers = [0, 1 ^ xorWith, -1 ^ xorWith, 3 ^ xorWith, -2 ^ xorWith, -1.5, 1, -1.5, 1, -1, 1.25];
     let sum = 0;
     let weightedSum = 0;
     sensors.forEach((e, i) => {
@@ -855,7 +855,7 @@ export class Car extends MovableEntity {
       } else if (frontImpossibility < 100 != hasDynamicThreat && !mainBlockedByCar) {
         let [sum, weightedSum] = this.getSensorSums(hasDynamicThreat);
         this.sumCounters[this.sumCounter++ % 5] = [sum, now];
-        let lastSums = sum || this.sumCounters.filter(e => now - e[1] < 100).map(e => e[0]).reduce((x, y) => x + Math.sign(y)); /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
+        let lastSums = this.sumCounters.filter(e => now - e[1] < 100).map(e => e[0]).reduce((x, y) => x + Math.sign(y)); /*büyüklüklüklerini hesaba katınca aynı yöne dönüyor*/
         if (typeof angleDifference == "number") lastSums += Math.sign(angleDifference);
         let sumSign = Math.sign(lastSums);
         if (IS_DEBUG) this.sprite.tint = 0x999999;
