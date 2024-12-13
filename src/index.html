@@ -1,44 +1,184 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <title>YZG</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
-      html,
-      body {
-        height: 100%;
-        margin: 0;
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: linear-gradient(to right, rgba(67, 113, 114, 0.5), rgb(255, 255, 255), rgba(67, 113, 114, 0.5));
+        }
+
+        #game {
+            height: 100vh;
+            width: auto;
+            max-width: 100%;
+            background-color: rgb(255, 255, 255);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #control-container {
+            position: absolute;
+            bottom: 20vh;
+            right: 40px;
+            display: grid;
+            grid-template-areas:
+                '. up .'
+                'left down right';
+            gap: 5px;
+            justify-items: center;
+        }
+
+        .control-button {
+            width: 60px;
+            height: 60px;
+            background-color: #1f2c37bb; 
+            border: 3px solid #416386;
+            box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+            color: white;
+            font-size: 24px;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        .control-button:active {
+            background-color: #416386;
+            transform: scale(0.92);
+        }
+
+        #control-up { grid-area: up; }
+        #control-left { grid-area: left; }
+        #control-down { grid-area: down; }
+        #control-right { grid-area: right; }
+
+        #control-brake-container {
+            position: absolute;
+            bottom: 10vh;
+            right: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #control-brake {
+            width: 200px;
+            height: 60px;
+            background-color: #1f2c37bb; 
+            border: 5px solid #416386; 
+            box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #control-brake:active {
+            background-color: #416386;
+            transform: scale(0.95);
+        }
+
+        .model {
+            position: absolute;
+            top: 40px;
+            right: 40px; 
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 200px;
+            align-items: center;
+        }
+
+        .checkbox-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #1f2c37bb; 
+            border: 3px solid #416386;
+            box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+            border-radius: 10px;
+            padding: 10px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #416386;
+            border-radius: 50%;
+            background-color: #1f2c37bb;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .checkbox-container input[type="checkbox"]:checked {
+            background-color: #416386;
+        }
+
+        .checkbox-container input[type="checkbox"]:checked::before {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 10px;
+            height: 10px;
+            background-color: white;
+            border-radius: 50%;
+        }
+
+        .checkbox-container label {
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        select {
+            width: 100%;
+            background-color: #1f2c37bb;
+            border: 3px solid #416386;
+            box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+            color: white;
+            font-size: 18px;
+            border-radius: 10px;
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        @media (max-width: 767px) {
+    #control-container {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
         display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-      }
-      #game {
-        height: 100vh;
-        width: auto;
-        max-width: 100%;
-        background-color: lightgray;
-      }
+        justify-content: space-between;
+        width: calc(100% - 20px);
+        padding: 5px;
+        background-color: rgba(0, 0, 0, 0);
+    }
 
-      /* ---------------- WASD Kontrol Butonları ------------------ */
-      #control-container {
-        position: absolute;
-        bottom: 20vh;
-        right: 1.5vh;
-        display: grid;
-        grid-template-areas:
-          'model model model'
-          '. up .'
-          'left down right';
-        gap: 5px;
-        justify-items: center;
-      }
-
-      .control-button {
+    .control-button {
         width: 60px;
         height: 60px;
-        background-color: rgba(0, 0, 0, 0.6);
-        border: 3px solid grey;
+        background-color: #1f2c37bb;
+        border: 3px solid #416386;
         box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
         color: white;
         font-size: 24px;
@@ -49,41 +189,46 @@
         cursor: pointer;
         user-select: none;
         transition: background-color 0.3s ease, transform 0.2s ease;
-      }
-      .control-button:active {
-        background-color: rgba(3, 146, 139, 0.774);
-        transform: scale(0.98);
-      }
+        font-family: 'Press Start 2P', cursive;
+    }
 
-      #control-up {
-        grid-area: up;
-      }
-      #control-left {
-        grid-area: left;
-      }
-      #control-down {
-        grid-area: down;
-      }
-      #control-right {
-        grid-area: right;
-      }
+    .control-button:active {
+        background-color: #416386;
+        transform: scale(0.92);
+    }
 
-      /* ------------------------------------------------------ */
-
-      #control-brake-container {
+    #control-left {
         position: absolute;
-        bottom: 10vh;
-        right: 1.5vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
+        bottom: 80px;
+        left: 10px;
+    }
 
-      #control-brake {
-        width: 200px;
+    #control-right {
+        position: absolute;
+        bottom: 80px;
+        left: 80px;
+    }
+
+    #control-up {
+        position: absolute;
+        bottom: 130px;
+        right: 25px; /* Ortalanmış */
+    }
+
+    #control-down {
+        position: absolute;
+        bottom: 60px;
+        right: 25px;
+    }
+
+    #control-brake {
+        position: absolute;
+        bottom: 20px;
+        right: 55px; 
+        width: 60px;
         height: 60px;
-        background-color: rgba(0, 0, 0, 0.6);
-        border: 5px solid grey;
+        background-color: #1f2c37bb;
+        border: 5px solid #416386;
         box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
         display: flex;
         justify-content: center;
@@ -91,81 +236,123 @@
         border-radius: 20px;
         cursor: pointer;
         transition: background-color 0.3s ease, transform 0.2s ease;
-      }
-      #control-brake:active {
-        background-color: rgba(3, 146, 139, 0.774);
-        transform: scale(0.98);
-      }
+        font-family: 'Press Start 2P', cursive;
+    }
 
-      /* ------------------------------------------------------ */
+    #control-brake:active {
+        background-color: #416386;
+        transform: scale(0.95);
+    }
 
-      .model {
+    .model {
+        position: absolute;
+        top: 40px;
+        right: 40px;
         display: flex;
         flex-direction: column;
         gap: 5px;
-      }
+        width: 150px;
+        align-items: center;
+    }
 
-      @media (max-width: 767px) {
-        #game {
-          width: 100vw !important;
-          height: auto !important;
-          position: absolute;
-          top: 0;
-        }
-        #control-container {
-          position: absolute;
-          bottom: 15%;
-          left: 50%;
-          transform: translateX(-55%);
-        }
+    .checkbox-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #1f2c37bb;
+        border: 3px solid #416386;
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+        border-radius: 10px;
+        padding: 5px;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
 
-        #control-brake-container {
-          position: absolute;
-          bottom: 5%;
-          left: 50%;
-          transform: translateX(-50%);
-        }
-      }
+    .checkbox-container input[type="checkbox"] {
+        appearance: none;
+        width: 15px;
+        height: 15px;
+        border: 2px solid #416386;
+        border-radius: 50%;
+        background-color: #1f2c37bb;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .checkbox-container input[type="checkbox"]:checked {
+        background-color: #1e8fff3d;
+    }
+
+    .checkbox-container input[type="checkbox"]:checked::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 7px;
+        height: 7px;
+        background-color: white;
+        border-radius: 50%;
+    }
+
+    .checkbox-container label {
+        font-family: 'Press Start 2P', cursive;
+        color: white;
+        margin-bottom: 5px;
+        font-size: 12px;
+    }
+
+    select {
+        width: 100%;
+        background-color: #1f2c37bb;
+        border: 3px solid #416386;
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+        color: white;
+        font-size: 14px;
+        border-radius: 10px;
+        padding: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+        font-family: 'Press Start 2P', cursive;
+    }
+
+    select option:hover {
+        background-color: #1E90FF; 
+    }
+}
+
     </style>
-  </head>
-
-  <body>
+</head>
+<body>
     <div id="game"></div>
 
-    <div id="control-container">
-      <div class="model" style="grid-area: model">
-        <input type="checkbox" id="prevent-goal" name="prevent" value="Prevent">
-        <label for="prevent-goal">Prevent Goal Action</label><br>
-
+    <div class="model">
+        <div class="checkbox-container">
+            <label for="prevent-goal">Prevent Goal Action</label>
+            <input type="checkbox" id="prevent-goal" name="prevent" value="Prevent">
+        </div>
         <select>
-          <option value="A*">A*</option>
-          <option value="DFS">DFS</option>
-          <option value="UCS">UCS</option>
+            <option value="A*">A*</option>
+            <option value="DFS">DFS</option>
+            <option value="UCS">UCS</option>
         </select>
-      </div>
+    </div>
 
-      <div id="control-left" class="control-button">A</div>
-      <div id="control-up" class="control-button">W</div>
-      <div id="control-right" class="control-button">D</div>
-      <div id="control-down" class="control-button">S</div>
+    <div id="control-container">
+        <div id="control-left" class="control-button">A</div>
+        <div id="control-up" class="control-button">W</div>
+        <div id="control-right" class="control-button">D</div>
+        <div id="control-down" class="control-button">S</div>
     </div>
 
     <div id="control-brake-container">
-      <div id="control-brake">
-        <img
-          src="../assets/space-icon.png"
-          alt="Space"
-          style="width: 150px; height: 30px"
-        />
-      </div>
+        <div id="control-brake">
+            <img src="../assets/space-icon.png" alt="Space" style="width: 150px; height: 30px" />
+        </div>
     </div>
 
     <script src="../modules/pixi.js"></script>
     <script src="../modules/tf.min.js"></script>
-    <script type="module" src="constants.mjs"></script>
     <script type="module" src="engine.mjs"></script>
-    <script type="module" src="classes.mjs"></script>
     <script type="module" src="game.mjs"></script>
     <script type="module" src="test.mjs"></script>
-  </body>
+</body>
 </html>
