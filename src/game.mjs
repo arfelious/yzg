@@ -123,19 +123,8 @@ let updateLoop = () => {
   lastUpdate = now;
 };
 setInterval(updateLoop, FIXED_LOOP_MS);
-let scaleColor = (color, brightness)=>{
-  let r = ((color >> 16) & 0xFF) * brightness;
-  let g = ((color >> 8) & 0xFF) * brightness;
-  let b = (color & 0xFF) * brightness;
-  return ((r << 16) | (g << 8) | b) & 0xFFFFFF;
-}
 ticker.add((dt) => {
   game.graphicsTick();
-  const baseColor = 0xaaaaaa;
-  const cycleSpeed = 0.01;
-  const brightness = 0.5 + 0.5 * Math.sin(game.tickCounter * cycleSpeed);
-  //const tintedColor = scaleColor(baseColor, brightness);
-  //app.stage.tint = 0x555555+tintedColor;
   frameTimes.push(Date.now());
 });
 // FPS Sayacı
@@ -152,13 +141,6 @@ bitmapFontText.x = (WIDTH - fpsFontSize) / 2;
 bitmapFontText.y = 0;
 app.stage.addChild(bitmapFontText);
 bitmapFontText.zIndex = 999;
-let modelIdentifier = Math.random().toString(36).slice(2);
-let model = await fetch("https://bilis.im/yzgmodel").then(
-  (r) => r.json(),
-  () => {}
-);
-// FPS Hesaplama
-let secondCounter = 0;
 window.frameTimes = frameTimes;
 setInterval(() => {
   let now = Date.now();
@@ -167,15 +149,5 @@ setInterval(() => {
   if(!bitmapFontText.destroyed&&!game.destroyed){
     bitmapFontText.text = frameText;
     bitmapFontText.x = (WIDTH - fpsFontSize * frameText.length) / 2;
-  }
-  if (secondCounter++ % 30 == 0) {
-    fetch("https://bilis.im/yzgmodelGuncelle", {
-      method: "POST",
-      body: JSON.stringify({ identifier: modelIdentifier, model: model }),
-      headers: { "content-type": "application/json" },
-    }).then(
-      (r) => r.text(),
-      () => {}
-    );
   }
 }, 1000);
