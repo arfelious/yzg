@@ -14,27 +14,21 @@ mainCar.setPosition(80, 100 + roadOffsetY);
 game.setWanderers()
 const startMove = (e) => {
   const button = e.target.classList.contains("control")?e.target:e.target.closest(".control-button");
+  if(!button)return
   let buttonId = button.id;
-  console.log("start",buttonId);
   let direction = buttonId.split("-")[1];
-  console.log(button, direction);
   isDown["button_" + direction.toUpperCase()] = true;
 };
-document.addEventListener("pointermove", (e) => {
-  //pinch zoom için
-  const touchCount = e.touches ? e.touches.length : 0;
-  if (touchCount > 1) {
-    e.preventDefault();
-  }
-})
 let brakeImage = document.getElementById("brake-image")
-brakeImage.addEventListener("contextmenu",(e)=>{
-  e.preventDefault()
-})
+brakeImage.oncontextmenu = e=>{
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  return false;
+}
 const stopMove = (e) => {
   const button = e.target.classList.contains("control")?e.target:e.target.closest(".control-button");
+  if(!button)return
   let buttonId = button.id;
-  console.log("stop",buttonId);
   let direction = buttonId.split("-")[1];
   isDown["button_" + direction.toUpperCase()] = false;
 };

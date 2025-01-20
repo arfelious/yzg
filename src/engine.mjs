@@ -702,7 +702,9 @@ await Promise.all(imagesArray.map(imgPath => new Promise(async (res) => {
   })));
 let sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 export let noop = () => {};
-document.body.appendChild(app.canvas);
+app.canvas.classList.add("game-canvas")
+let game = document.querySelector("#game")
+game.appendChild(app.canvas);
 app.canvas.style = "";
 app.canvas.id = "game";
 export let toRadian = (x) => (x / 180) * Math.PI;

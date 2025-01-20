@@ -24,12 +24,6 @@
             background-color: rgb(255, 255, 255);
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
-        @media (max-width: 767px) {
-            #game {
-                width: 100vw;
-                height: auto;
-            }
-        }
         #control-container {
             position: absolute;
             bottom: 20vh;
@@ -40,6 +34,7 @@
                 'left down right';
             gap: 5px;
             justify-items: center;
+            padding-bottom:70px
         }
 
         .control-button {
@@ -71,14 +66,13 @@
         #control-right { grid-area: right; }
 
         #control-brake-container {
+            width:210px;
             position: absolute;
-            bottom: 10vh;
-            right: 40px;
             display: flex;
             justify-content: center;
             align-items: center;
+            bottom: 0;
         }
-
         #control-brake {
             width: 200px;
             height: 60px;
@@ -92,14 +86,14 @@
             cursor: pointer;
             transition: background-color 0.3s ease, transform 0.2s ease;
             font-family: 'Press Start 2P', cursive;
+            position: relative;
         }
-
         #control-brake:active {
             background-color: #416386;
             transform: scale(0.95);
         }
 
-        .model {
+        .prevent-goal-container {
             position: absolute;
             top: 40px;
             right: 40px; 
@@ -169,168 +163,202 @@
         }
 
         @media (max-width: 767px) {
-    #control-container {
-        position: fixed;
-        bottom: 10px;
-        left: 10px;
-        display: flex;
-        justify-content: space-between;
-        width: calc(100% - 20px);
-        padding: 5px;
-        background-color: rgba(0, 0, 0, 0);
-    }
+            #game {
+                width: 100vw;
+                height: auto;
+            }
+            #control-brake-container {
+                top:20px;
+                left:-40px
+            }
+            #control-brake{
+                position: relative;
+            }
+            #brake-image {
+                width: auto
+            }
+            #control-container {
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                display: flex;
+                justify-content: space-between;
+                width: calc(100% - 20px);
+                padding: 5px;
+                background-color: rgba(0, 0, 0, 0);
+            }
+            .control-button {
+                width: 60px;
+                height: 60px;
+                background-color: #1f2c37bb;
+                border: 3px solid #416386;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+                color: white;
+                font-size: 24px;
+                border-radius: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+                user-select: none;
+                transition: background-color 0.3s ease, transform 0.2s ease;
+                font-family: 'Press Start 2P', cursive;
+            }
+            .control-brake{
+                width: 120px
+            }
+            .control-brake-container {
+                width:120px
+            }
+            .control-button:active {
+                background-color: #416386;
+                transform: scale(0.92);
+            }
+        
+            #control-left {
+                position: absolute;
+                bottom: 80px;
+                left: 10px;
+            }
+        
+            #control-right {
+                position: absolute;
+                bottom: 80px;
+                left: 80px;
+            }
+        
+            #control-up {
+                position: absolute;
+                bottom: 130px;
+                right: 25px;
+            }
 
-    .control-button {
-        width: 60px;
-        height: 60px;
-        background-color: #1f2c37bb;
-        border: 3px solid #416386;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
-        color: white;
-        font-size: 24px;
-        border-radius: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        user-select: none;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-        font-family: 'Press Start 2P', cursive;
-    }
+            #control-down {
+                position: absolute;
+                bottom: 60px;
+                right: 25px;
+            }
+        
+            #control-brake {
+                position: absolute;
+                bottom: 20px;
+                right: 25px; 
+                width: 122px;
+                height: 60px;
+                background-color: #1f2c37bb;
+                border: 5px solid #416386;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: background-color 0.1s ease, transform 0.1s ease;
+                font-family: 'Press Start 2P', cursive;
+            }
 
-    .control-button:active {
-        background-color: #416386;
-        transform: scale(0.92);
-    }
+            #control-brake:active {
+                background-color: #416386;
+                transform: scale(0.95);
+            }
+            .prevent-goal-container{
+                position: absolute;
+                top: 40px;
+                right: 40px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                width: 150px;
+                align-items: center;
+            }
 
-    #control-left {
-        position: absolute;
-        bottom: 80px;
-        left: 10px;
-    }
+            .checkbox-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: #1f2c37bb;
+                border: 3px solid #416386;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+                border-radius: 10px;
+                padding: 5px;
+                transition: background-color 0.3s ease, transform 0.2s ease;
+            }
+        
+            .checkbox-container input[type="checkbox"] {
+                appearance: none;
+                width: 15px;
+                height: 15px;
+                border: 2px solid #416386;
+                border-radius: 50%;
+                background-color: #1f2c37bb;
+                cursor: pointer;
+                position: relative;
+            }
+        
+            .checkbox-container input[type="checkbox"]:checked {
+                background-color: #1e8fff3d;
+            }
+        
+            .checkbox-container input[type="checkbox"]:checked::before {
+                content: '';
+                position: absolute;
+                top: 3px;
+                left: 3px;
+                width: 7px;
+                height: 7px;
+                background-color: white;
+                border-radius: 50%;
+            }
+        
+            .checkbox-container label {
+                font-family: 'Press Start 2P', cursive;
+                color: white;
+                margin-bottom: 5px;
+                font-size: 12px;
+            }
+        
+            select {
+                width: 100%;
+                background-color: #1f2c37bb;
+                border: 3px solid #416386;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
+                color: white;
+                font-size: 14px;
+                border-radius: 10px;
+                padding: 5px;
+                cursor: pointer;
+                transition: background-color 0.3s ease, transform 0.2s ease;
+                font-family: 'Press Start 2P', cursive;
+            }
+        
+            select option:hover {
+                background-color: #1E90FF; 
+            }
+        }
+        @media (max-height: 480px){
+            #game{
+                height: 80vh;
+                width:400px
 
-    #control-right {
-        position: absolute;
-        bottom: 80px;
-        left: 80px;
-    }
-
-    #control-up {
-        position: absolute;
-        bottom: 130px;
-        right: 25px; /* Ortalanmış */
-    }
-
-    #control-down {
-        position: absolute;
-        bottom: 60px;
-        right: 25px;
-    }
-
-    #control-brake {
-        position: absolute;
-        bottom: 20px;
-        right: 55px; 
-        width: 60px;
-        height: 60px;
-        background-color: #1f2c37bb;
-        border: 5px solid #416386;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-radius: 20px;
-        cursor: pointer;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-        font-family: 'Press Start 2P', cursive;
-    }
-
-    #control-brake:active {
-        background-color: #416386;
-        transform: scale(0.95);
-    }
-
-    .model {
-        position: absolute;
-        top: 40px;
-        right: 40px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        width: 150px;
-        align-items: center;
-    }
-
-    .checkbox-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background-color: #1f2c37bb;
-        border: 3px solid #416386;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
-        border-radius: 10px;
-        padding: 5px;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-    }
-
-    .checkbox-container input[type="checkbox"] {
-        appearance: none;
-        width: 15px;
-        height: 15px;
-        border: 2px solid #416386;
-        border-radius: 50%;
-        background-color: #1f2c37bb;
-        cursor: pointer;
-        position: relative;
-    }
-
-    .checkbox-container input[type="checkbox"]:checked {
-        background-color: #1e8fff3d;
-    }
-
-    .checkbox-container input[type="checkbox"]:checked::before {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 7px;
-        height: 7px;
-        background-color: white;
-        border-radius: 50%;
-    }
-
-    .checkbox-container label {
-        font-family: 'Press Start 2P', cursive;
-        color: white;
-        margin-bottom: 5px;
-        font-size: 12px;
-    }
-
-    select {
-        width: 100%;
-        background-color: #1f2c37bb;
-        border: 3px solid #416386;
-        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.36);
-        color: white;
-        font-size: 14px;
-        border-radius: 10px;
-        padding: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease, transform 0.2s ease;
-        font-family: 'Press Start 2P', cursive;
-    }
-
-    select option:hover {
-        background-color: #1E90FF; 
-    }
-}
-
+            }
+            #game-canvas{
+                height:90vh;
+            }
+            .prevent-goal-container{
+                width:100px;
+                left:30px
+            }
+            #control-container{
+                right:0
+            }
+ 
+        }
     </style>
 </head>
 <body>
     <div id="game"></div>
 
-    <div class="model">
+    <div class="prevent-goal-container">
         <div class="checkbox-container">
             <label for="prevent-goal">Prevent Goal Action</label>
             <input type="checkbox" id="prevent-goal" name="prevent" value="Prevent">
@@ -348,7 +376,7 @@
         <div id="control-right" class="control-button">D</div>
         <div id="control-down" class="control-button">S</div>
         <div id="control-brake-container">
-            <div id="control-brake" class="control control-button">
+            <div id="control-brake" class="control-button control-brake">
                 <img src="../assets/space-icon.png" alt="Space" id="brake-image" style="width: 150px; height: 30px" />
             </div>
         </div>
