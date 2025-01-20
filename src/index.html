@@ -14,6 +14,7 @@
             align-items: center;
             overflow: hidden;
             background: linear-gradient(to right, rgba(67, 113, 114, 0.5), rgb(255, 255, 255), rgba(67, 113, 114, 0.5));
+            touch-action: none;
         }
 
         #game {
@@ -23,7 +24,12 @@
             background-color: rgb(255, 255, 255);
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
-
+        @media (max-width: 767px) {
+            #game {
+                width: 100vw;
+                height: auto;
+            }
+        }
         #control-container {
             position: absolute;
             bottom: 20vh;
@@ -341,13 +347,13 @@
         <div id="control-up" class="control-button">W</div>
         <div id="control-right" class="control-button">D</div>
         <div id="control-down" class="control-button">S</div>
-    </div>
-
-    <div id="control-brake-container">
-        <div id="control-brake">
-            <img src="../assets/space-icon.png" alt="Space" style="width: 150px; height: 30px" />
+        <div id="control-brake-container">
+            <div id="control-brake" class="control control-button">
+                <img src="../assets/space-icon.png" alt="Space" id="brake-image" style="width: 150px; height: 30px" />
+            </div>
         </div>
     </div>
+
 
     <script src="../modules/pixi.js"></script>
     <script src="../modules/tf.min.js"></script>

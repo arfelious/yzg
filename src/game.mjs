@@ -12,34 +12,36 @@ let mainCar = new MainCar(game, "temp_car.png");
 window.mainCar = mainCar;
 mainCar.setPosition(80, 100 + roadOffsetY);
 game.setWanderers()
-//--------------------------------------------------
-// WASD Butonları
-const controlButtons = {
-  up: document.getElementById("control-up"),
-  left: document.getElementById("control-left"),
-  down: document.getElementById("control-down"),
-  right: document.getElementById("control-right"),
-  brake: document.getElementById("control-brake"), // Fren için (space button)
-};
-
-// Kontrol işlevleri
-const startMove = (direction) => {
+const startMove = (e) => {
+  const button = e.target.classList.contains("control")?e.target:e.target.closest(".control-button");
+  let buttonId = button.id;
+  console.log("start",buttonId);
+  let direction = buttonId.split("-")[1];
+  console.log(button, direction);
   isDown["button_" + direction.toUpperCase()] = true;
 };
-
-const stopMove = (direction) => {
+document.addEventListener("pointermove", (e) => {
+  //pinch zoom için
+  const touchCount = e.touches ? e.touches.length : 0;
+  if (touchCount > 1) {
+    e.preventDefault();
+  }
+})
+let brakeImage = document.getElementById("brake-image")
+brakeImage.addEventListener("contextmenu",(e)=>{
+  e.preventDefault()
+})
+const stopMove = (e) => {
+  const button = e.target.classList.contains("control")?e.target:e.target.closest(".control-button");
+  let buttonId = button.id;
+  console.log("stop",buttonId);
+  let direction = buttonId.split("-")[1];
   isDown["button_" + direction.toUpperCase()] = false;
 };
-// Butonlara olay dinleyicileri ekleme
-const addControlListeners = (button, direction) => {
-  button.addEventListener("pointerdown", () => startMove(direction));
-  button.addEventListener("pointerup", () => stopMove(direction));
-  button.addEventListener("pointerout", () => stopMove(direction));
-};
-
-Object.entries(controlButtons).forEach(([direction, button]) => {
-  addControlListeners(button, direction);
-});
+let controlContainer = document.getElementById("control-container")
+controlContainer.addEventListener("pointerdown",(e)=>startMove(e))
+controlContainer.addEventListener("pointerup",(e)=>stopMove(e))
+controlContainer.addEventListener("pointerout",(e)=>stopMove(e))
 
 //--------------------------------------------------
 
